@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-// Mirror preview via CSS only — the captured file stays unmirrored (FR-03).
+// Preview apa adanya, tanpa mirror — sama persis dengan file hasil.
 export function CameraView({
   videoRef,
   ready,
@@ -29,7 +29,7 @@ export function CameraView({
         autoPlay
         playsInline
         muted
-        className="h-full w-full object-cover [-transform:scaleX(-1)]"
+        className="h-full w-full object-cover"
       />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-sm text-zinc-400">

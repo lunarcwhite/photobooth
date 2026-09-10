@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type CameraStatus = "idle" | "requesting" | "ready" | "denied" | "unsupported" | "error";
 
-// Camera hook (FR-03). Preview is mirrored via CSS; capture is NOT mirrored.
+// Camera hook (FR-03). Preview dan file sama-sama tanpa mirror (WYSIWYG).
 // Stream is stopped on unmount or via stop().
 export function useCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);

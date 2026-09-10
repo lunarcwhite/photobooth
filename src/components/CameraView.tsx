@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-// Preview apa adanya, tanpa mirror — sama persis dengan file hasil.
+// Preview mirror seperti cermin selfie — file hasil ikut di-mirror agar sama persis.
 export function CameraView({
   videoRef,
   ready,
@@ -29,7 +29,7 @@ export function CameraView({
         autoPlay
         playsInline
         muted
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover [-transform:scaleX(-1)]"
       />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-sm text-zinc-400">

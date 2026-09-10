@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type CameraStatus = "idle" | "requesting" | "ready" | "denied" | "unsupported" | "error";
 
-// Camera hook (FR-03). Preview dan file sama-sama tanpa mirror (WYSIWYG).
+// Camera hook (FR-03). Preview dan file SAMA-SAMA di-mirror seperti cermin
+// selfie: angkat kanan → kanan layar naik, dan file hasil ikut pose itu.
 // Stream is stopped on unmount or via stop().
 export function useCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -58,7 +59,7 @@ export function useCamera() {
 
   useEffect(() => stop, [stop]);
 
-  // Grab current frame → JPEG blob. Long side capped, no mirror, no stretch.
+  // Grab current frame → JPEG blob, di-mirror agar sama dengan preview.
   const captureShot = useCallback(async (maxSide = 1280, quality = 0.85): Promise<Blob> => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) throw new Error("kamera belum siap");
@@ -69,6 +70,8 @@ export function useCamera() {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d")!;
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, w, h);
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
     if (!blob) throw new Error("gagal mengambil foto");

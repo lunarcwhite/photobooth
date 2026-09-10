@@ -22,15 +22,17 @@ export function useCamera() {
   });
 
   const toggleMirror = useCallback(() => {
-    setMirrored((m) => {
-      try {
-        localStorage.setItem("ldr_mirror", m ? "off" : "on");
-      } catch {
-        /* abaikan */
-      }
-      return !m;
-    });
+    setMirrored((m) => !m);
   }, []);
+
+  // Persist pilihan di luar updater agar tidak ganda saat StrictMode.
+  useEffect(() => {
+    try {
+      localStorage.setItem("ldr_mirror", mirrored ? "on" : "off");
+    } catch {
+      /* abaikan */
+    }
+  }, [mirrored]);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());

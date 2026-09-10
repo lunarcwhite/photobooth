@@ -33,7 +33,7 @@ export function CameraView({
         autoPlay
         playsInline
         muted
-        className={`h-full w-full object-cover ${mirrored ? "[-transform:scaleX(-1)]" : ""}`}
+        className={`h-full w-full object-cover ${mirrored ? "scale-x-[-1]" : ""}`}
       />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-sm text-zinc-400">

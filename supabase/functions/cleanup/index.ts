@@ -7,10 +7,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const URL = Deno.env.get("SUPABASE_URL")!;
+const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CLEANUP_KEY = Deno.env.get("CLEANUP_KEY")!;
-const db = createClient(URL, SERVICE_KEY);
+const db = createClient(SB_URL, SERVICE_KEY);
 
 async function removePrefix(bucket: string, prefix: string, olderThanMs: number) {
   const now = Date.now();

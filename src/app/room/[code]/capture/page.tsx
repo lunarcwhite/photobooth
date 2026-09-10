@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizeCode } from "@/lib/room/session";
-import { loadRoomBundle, loadCaptureBundle, saveShotsBundle } from "@/lib/room/bundle";
+import { loadRoomBundle, loadCaptureBundle, saveShotsBundle, type RoomBundle, type CaptureBundle } from "@/lib/room/bundle";
 import { useCamera } from "@/hooks/useCamera";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { uploadShot, blobToDataURL } from "@/lib/storage/exchange";
@@ -26,13 +26,15 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const code = normalizeCode(rawCode);
   const router = useRouter();
 
-  const bundle = useMemo(() => loadRoomBundle(code), [code]);
-  const capture = useMemo(() => loadCaptureBundle(code), [code]);
+  const [bundle, setBundle] = useState<RoomBundle | null>(null);
+  const [capture, setCapture] = useState<CaptureBundle | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const cam = useCamera();
   const cameraReady = cam.status === "ready";
   const [offset, setOffset] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
+  // Init 0 agar render server = client; jam nyata diisi effect setelah mount.
+  const [now, setNow] = useState(0);
   const [fired, setFired] = useState<boolean[]>([false, false, false, false]);
   const [st, setSt] = useState<State>({
     done: [false, false, false, false],
@@ -94,10 +96,20 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
   const { send } = useRoomChannel(code, me, onEvent);
 
+  // Baca storage setelah mount: sinkronisasi React ↔ browser storage.
+  /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi mount ↔ storage browser, sah */
+  useEffect(() => {
+    setBundle(loadRoomBundle(code));
+    setCapture(loadCaptureBundle(code));
+    setMounted(true);
+  }, [code]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // Redirect ganda: tanpa bundle/capture → kembali ke ruang tunggu.
   useEffect(() => {
+    if (!mounted) return;
     if (!bundle || !capture) router.replace(`/room/${code}`);
-  }, [bundle, capture, code, router]);
+  }, [mounted, bundle, capture, code, router]);
 
   // Kamera auto-start (sudah ada konteks: user menekan MULAI di ruang tunggu).
   useEffect(() => {
@@ -121,12 +133,15 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tick 100ms untuk countdown presisi.
+  // Tick 100ms untuk countdown presisi (timer eksternal → state).
+  /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi timer eksternal, sah */
   useEffect(() => {
     if (!targetTimes) return;
+    setNow(Date.now() + offset);
     const id = setInterval(() => setNow(Date.now() + offset), 100);
     return () => clearInterval(id);
   }, [targetTimes, offset]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const [tabHidden, setTabHidden] = useState(false);
   useEffect(() => {
@@ -247,7 +262,13 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     finishLocal();
   };
 
-  if (!bundle || !capture) return null;
+  if (!mounted || !bundle || !capture) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
+        <p className="text-center text-sm text-zinc-500">Menyiapkan sesi foto...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 py-6">

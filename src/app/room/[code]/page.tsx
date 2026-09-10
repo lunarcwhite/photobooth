@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { roomApi, RoomApiError, type Member } from "@/lib/room/api";
 import { normalizeCode, validateDisplayName } from "@/lib/room/session";
-import { loadRoomBundle, saveRoomBundle, saveCaptureBundle, loadCaptureBundle } from "@/lib/room/bundle";
+import { loadRoomBundle, saveRoomBundle, saveCaptureBundle, loadCaptureBundle, type RoomBundle } from "@/lib/room/bundle";
 import { useCamera } from "@/hooks/useCamera";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { track } from "@/lib/analytics/events";
@@ -17,7 +17,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   const code = normalizeCode(rawCode);
   const router = useRouter();
 
-  const [bundle, setBundle] = useState(() => loadRoomBundle(code));
+  const [bundle, setBundle] = useState<RoomBundle | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [shareLink, setShareLink] = useState(`/room/${code}`);
   const [members, setMembers] = useState<Member[]>([]);
   const [roomStatus, setRoomStatus] = useState<string>("memuat...");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -58,6 +60,16 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   );
 
   const { peers, connected, send } = useRoomChannel(code, me, onEvent);
+
+  // Baca storage + origin setelah mount: sinkronisasi React ↔ browser
+  // storage setelah SSR. Server dan client render shell yang sama.
+  /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi mount ↔ storage browser, sah */
+  useEffect(() => {
+    setBundle(loadRoomBundle(code));
+    setShareLink(`${window.location.origin}/room/${code}`);
+    setMounted(true);
+  }, [code]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Verifikasi keanggotaan + pulihkan sesi aktif (refresh mid-session).
   useEffect(() => {
@@ -162,7 +174,6 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     return bundle ? ready.includes(bundle.participantId) && peers.filter((p) => p.cameraReady).length >= 2 : false;
   }, [peers, bundle]);
 
-  const shareLink = typeof window !== "undefined" ? `${window.location.origin}/room/${code}` : `/room/${code}`;
   const [copied, setCopied] = useState(false);
   const copyLink = async () => {
     try {
@@ -173,6 +184,14 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
       /* clipboard diblokir — user bisa salin manual */
     }
   };
+
+  if (!mounted) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
+        <p className="text-center text-sm text-zinc-500">Memuat room...</p>
+      </main>
+    );
+  }
 
   if (!bundle) {
     return (

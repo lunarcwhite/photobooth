@@ -13,17 +13,23 @@ export function useCamera() {
   const [status, setStatus] = useState<CameraStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   // Mirror selfie seperti cermin, tersimpan per-browser. Default nyala.
-  const [mirrored, setMirrored] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("ldr_mirror") !== "off";
-    } catch {
-      return true;
-    }
-  });
+  // Dibaca di effect (bukan saat render) agar SSR dan client sama.
+  const [mirrored, setMirrored] = useState<boolean>(true);
 
   const toggleMirror = useCallback(() => {
     setMirrored((m) => !m);
   }, []);
+
+  // Muat preferensi tersimpan setelah mount (sinkronisasi ↔ localStorage).
+  /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi mount ↔ localStorage, sah */
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("ldr_mirror") === "off") setMirrored(false);
+    } catch {
+      /* abaikan */
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Persist pilihan di luar updater agar tidak ganda saat StrictMode.
   useEffect(() => {

@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizeCode } from "@/lib/room/session";
-import { loadShotsBundle } from "@/lib/room/bundle";
+import { loadShotsBundle, type ShotsBundle } from "@/lib/room/bundle";
 import { downloadShot } from "@/lib/storage/exchange";
 import { composeFinal } from "@/lib/canvas/compose";
 import { track } from "@/lib/analytics/events";
@@ -15,19 +15,33 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
   const code = normalizeCode(rawCode);
   const router = useRouter();
 
-  const shots = useMemo(() => loadShotsBundle(code), [code]);
+  const [shots, setShots] = useState<ShotsBundle | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [tplIndex, setTplIndex] = useState(0);
-  const [partnerShots, setPartnerShots] = useState<(string | null)[]>(() => shots?.partnerShots ?? [null, null, null, null]);
+  const [partnerShots, setPartnerShots] = useState<(string | null)[]>([null, null, null, null]);
   const [loading, setLoading] = useState<boolean[]>([false, false, false, false]);
   const [finalUrl, setFinalUrl] = useState<string | null>(null);
   const [finalBlob, setFinalBlob] = useState<Blob | null>(null);
   const [composing, setComposing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+
+  // Baca storage setelah mount: sinkronisasi React ↔ browser storage.
+  /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi mount ↔ storage browser, sah */
+  useEffect(() => {
+    const s = loadShotsBundle(code);
+    setShots(s);
+    if (s) setPartnerShots(s.partnerShots);
+    setCanShare(typeof navigator !== "undefined" && "share" in navigator);
+    setMounted(true);
+  }, [code]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
+    if (!mounted) return;
     if (!shots) router.replace(`/room/${code}`);
-  }, [shots, code, router]);
+  }, [mounted, shots, code, router]);
 
   // Unduh foto pasangan via signed URL; gagal = placeholder + retry (§10).
   const loadPartner = useCallback(
@@ -137,9 +151,13 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     download();
   };
 
-  if (!shots) return null;
-
-  const canShare = typeof navigator !== "undefined" && "share" in navigator;
+  if (!mounted || !shots) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
+        <p className="text-center text-sm text-zinc-500">Menyiapkan hasil...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 py-6">

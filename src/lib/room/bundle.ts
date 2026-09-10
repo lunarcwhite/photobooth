@@ -1,7 +1,7 @@
-// Per-room identity bundle, kept in localStorage (browser-scoped, same as
-// session_id). Lets waiting → capture → result pages share roomId +
-// participantId without trusting broadcast payloads. New tab = same browser
-// session = same participant slot (FR-02).
+// Semua loader di bawah aman dipanggil saat render: di server kembalikan
+// null (tanpa menyentuh storage), di client baca storage langsung.
+// Halaman menampilkan loading yang SAMA di server dan client, lalu isi
+// state asli di effect setelah mount — tanpa hydration mismatch.
 export interface RoomBundle {
   roomId: string;
   participantId: string;

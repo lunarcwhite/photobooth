@@ -2,15 +2,19 @@
 
 import { useEffect, useRef } from "react";
 
-// Preview mirror seperti cermin selfie — file hasil ikut di-mirror agar sama persis.
+// Preview ikut mode mirror + tombol Cermin/Normal. File hasil selalu = preview.
 export function CameraView({
   videoRef,
   ready,
   label,
+  mirrored,
+  onToggleMirror,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   ready: boolean;
   label: string;
+  mirrored: boolean;
+  onToggleMirror?: () => void;
 }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
 
@@ -29,7 +33,7 @@ export function CameraView({
         autoPlay
         playsInline
         muted
-        className="h-full w-full object-cover [-transform:scaleX(-1)]"
+        className={`h-full w-full object-cover ${mirrored ? "[-transform:scaleX(-1)]" : ""}`}
       />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-sm text-zinc-400">
@@ -39,6 +43,15 @@ export function CameraView({
       <div className="absolute bottom-2 left-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
         {label}
       </div>
+      {onToggleMirror && (
+        <button
+          type="button"
+          onClick={onToggleMirror}
+          className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white"
+        >
+          {mirrored ? "🪞 Cermin" : "📷 Normal"}
+        </button>
+      )}
     </div>
   );
 }

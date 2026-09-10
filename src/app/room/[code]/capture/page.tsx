@@ -260,7 +260,13 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <CameraView videoRef={cam.videoRef} ready={cameraReady} label="Kamu" />
+        <CameraView
+          videoRef={cam.videoRef}
+          ready={cameraReady}
+          label="Kamu"
+          mirrored={cam.mirrored}
+          onToggleMirror={cam.toggleMirror}
+        />
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-zinc-900">
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-zinc-400">
             <span className="text-2xl">📷</span>

@@ -227,7 +227,13 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         </div>
       </Card>
 
-      <CameraView videoRef={cam.videoRef} ready={cameraReady} label="Kamu" />
+      <CameraView
+        videoRef={cam.videoRef}
+        ready={cameraReady}
+        label="Kamu"
+        mirrored={cam.mirrored}
+        onToggleMirror={cam.toggleMirror}
+      />
 
       {cam.status === "requesting" ? (
         <p className="text-center text-sm text-zinc-500">Membuka kamera...</p>

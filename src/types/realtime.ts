@@ -36,6 +36,11 @@ export interface RoomEndedEvent {
 
 // WebRTC signaling (P2P video+suara). Pesan kecil via Broadcast yang sama.
 // `from` = participantId pengirim; penerima bukan pengirim memprosesnya.
+export interface CallHelloEvent {
+  event: "call_hello";
+  from: string;
+}
+
 export interface CallOfferEvent {
   event: "call_offer";
   from: string;
@@ -65,6 +70,7 @@ export type RoomBroadcastEvent =
   | CaptureAckEvent
   | SessionFinishedEvent
   | RoomEndedEvent
+  | CallHelloEvent
   | CallOfferEvent
   | CallAnswerEvent
   | CallIceEvent

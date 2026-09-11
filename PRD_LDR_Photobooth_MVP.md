@@ -1,12 +1,21 @@
 # Product Requirements Document (PRD)
 # LDR Photobooth — MVP Private Beta
 
-**Version:** 1.2
-**Status:** Draft siap development
+**Version:** 1.3
+**Status:** In development — backend live, frontend tested 2-device via ngrok
 **Target beta:** 6–10 pengguna / beberapa pasangan
 **Platform:** Web, mobile-first
 **Deployment target:** Free-tier / serverless
 **Recommended stack:** Next.js + TypeScript + Tailwind CSS + Supabase + Vercel
+
+### Changelog 1.2 → 1.3
+- Capture otomatis (`targetTimes[4]` dari server) DIGANTI capture manual: host tekan tombol per foto → broadcast `shot_armed {sequence, targetAt = correctedNow + 5000ms}` → kedua HP countdown 5→1 → jepret bareng. Jadwal server tidak dipakai lagi.
+- WebRTC P2P live preview + suara MASUK (di luar MVP awal): signaling via Broadcast (`call_hello/offer/answer/ice/bye`), STUN public, tanpa TURN. Remote video di waiting + capture, tombol mute mic.
+- Mirror selfie: preview + file sama-sama mirror (mode Cermin default), tombol Cermin/Normal per-browser (`ldr_mirror`).
+- Hydration fix: storage/window dibaca di effect setelah mount, loading shell sama di server/client.
+- Navigasi: ruang tunggu tidak auto-push ke capture (anti bounce) — banner rejoin manual. Layar keluar resmi saat host akhiri room (waiting + capture).
+- Supabase live: schema jalan, 2 bucket private, `room-api` + `cleanup` deployed. pg_cron per jam BELUM dijadwalkan.
+- Diverifikasi: create→join→kamera (HTTPS ngrok)→MULAI→4 shot→hasil→download di 2 perangkat.
 
 ### Changelog 1.1 → 1.2
 - Kunci penerbit `targetTimes`: `POST room-api/start` hitung dari jam server; host hanya broadcast hasilnya, bukan sumber waktu.
@@ -1573,81 +1582,91 @@ untuk final images.
 
 ---
 
-# 34. MVP Backlog
+# 34. MVP Backlog — status implementasi (audit 2026-09-11)
 
-| ID | Task | Priority | Acceptance |
+| ID | Task | Priority | Status |
 |---|---|---|---|
-| MVP-01 | Bootstrap Next.js + TypeScript + Tailwind | P0 | App deployable |
-| MVP-02 | Setup Supabase + schema (4 tabel) + `server_time_ms` + RLS (§17/§18.2) | P0 | SQL §17 jalan |
-| MVP-02b | Edge Function `room-api` (FR-05) + `cleanup` (pg_cron §17) | P0 | Kontrak FR-05 + signed URL jalan |
-| MVP-03 | Create room (via room-api) | P0 | Unique room works |
-| MVP-04 | Join room (via room-api, tolak ke-3) | P0 | Second participant works |
-| MVP-05 | Presence + Broadcast (tanpa postgres_changes) | P0 | Both see online state |
-| MVP-06 | Camera hook (FR-03: mirror preview, cover crop) | P0 | Preview + permission |
-| MVP-07 | Ready state (ephemeral, bukan status DB) | P0 | Both ready |
-| MVP-08 | Capture scheduler (targetTimes tunggal + clock offset) | P0 | Synchronized 4 shots |
-| MVP-08b | Photo exchange (upload per-shot + ACK storagePath + download pasangan) | P0 | 8 foto terkumpul di kedua client |
-| MVP-09 | Canvas composer (1080×1920, 8 slots, di kedua client) | P0 | Final image generated |
-| MVP-10 | Result/download (JPEG q0.9; share opsional) | P0 | JPEG downloads |
-| MVP-11 | Reconnect/session-baru (tanpa retake per-shot) | P1 | Common failures recover |
-| MVP-12 | 2 template JSON frontend (§13/§29) | P1 | Switchable layout |
-| MVP-13 | Analytics insert-only (§16.6/§30) | P1 | Events recorded |
-| MVP-14 | Privacy/cleanup (§14/§19) | P1 | Expired data cleaned |
+| MVP-01 | Bootstrap Next.js + TypeScript + Tailwind | P0 | ✅ Done (Next 16, TW v4, build hijau) |
+| MVP-02 | Setup Supabase + schema (4 tabel) + `server_time_ms` + RLS (§17/§18.2) | P0 | ✅ Done, live |
+| MVP-02b | Edge Function `room-api` (FR-05) + `cleanup` | P0 | ✅ Deployed keduanya; ⚠️ pg_cron per jam BELUM dijadwalkan |
+| MVP-03 | Create room (via room-api) | P0 | ✅ Done, tested 2-device |
+| MVP-04 | Join room (via room-api, tolak ke-3) | P0 | ✅ Done (tolak ke-3 di server; belum diuji eksplisit) |
+| MVP-05 | Presence + Broadcast (tanpa postgres_changes) | P0 | ✅ Done |
+| MVP-06 | Camera hook (FR-03: mirror preview, cover crop) | P0 | ✅ Done + tombol Cermin/Normal |
+| MVP-07 | Ready state (ephemeral, bukan status DB) | P0 | ✅ Done |
+| MVP-08 | Capture scheduler manual: tombol host → `shot_armed` + countdown 5 dtk + clock offset | P0 | ✅ Done (menggantikan `targetTimes` otomatis) |
+| MVP-08b | Photo exchange (upload per-shot + ACK storagePath + download pasangan) | P0 | ✅ Done, tested |
+| MVP-09 | Canvas composer (1080×1920, 8 slots, di kedua client) | P0 | ✅ Done, tested |
+| MVP-10 | Result/download (JPEG q0.9; share opsional) | P0 | ✅ Done, tested |
+| MVP-11 | Reconnect/session-baru (tanpa retake per-shot) | P1 | 🟡 Sebagian: rejoin manual + refresh mid-session; belum uji putus jaringan |
+| MVP-12 | 2 template JSON frontend (§13/§29) | P1 | ✅ Done |
+| MVP-13 | Analytics insert-only (§16.6/§30) | P1 | ✅ Kode fire-and-forget ada; belum verifikasi event masuk DB |
+| MVP-14 | Privacy/cleanup (§14/§19) | P1 | 🟡 Kode cleanup deployed; pg_cron BELUM dijadwalkan |
+| EXTRA-01 | WebRTC P2P live preview + suara (di luar MVP awal) | — | 🟡 Jalan di jaringan normal; tanpa TURN, belum uji NAT ketat |
+
+### Yang belum dikerjakan / belum diverifikasi
+- [ ] Jadwalkan pg_cron per jam → Edge Function `cleanup`.
+- [ ] Verifikasi analytics events masuk tabel.
+- [ ] Uji tolak participant ketiga secara eksplisit.
+- [ ] Uji putus jaringan / reconnect mid-session.
+- [ ] Uji TURN / jaringan NAT ketat untuk call.
+- [ ] Deploy Vercel + uji matriks §37 (Android↔iPhone, Wi-Fi↔cellular, iOS Safari download).
+- [ ] Beta 6–10 tester + feedback kualitatif.
 
 ---
 
-# 35. Acceptance Criteria
+# 35. Acceptance Criteria — hasil audit 2026-09-11 (tested 2-device via ngrok)
 
 ### Room
 
-- [ ] User A dapat membuat room.
-- [ ] Room memiliki code unik.
-- [ ] User A mendapatkan share link.
-- [ ] User B dapat join menggunakan link.
-- [ ] Participant ketiga ditolak.
+- [x] User A dapat membuat room.
+- [x] Room memiliki code unik.
+- [x] User A mendapatkan share link.
+- [x] User B dapat join menggunakan link.
+- [ ] Participant ketiga ditolak (kode server ada, belum diuji eksplisit).
 
 ### Camera
 
-- [ ] Kamera dapat diminta melalui HTTPS.
-- [ ] Preview muncul.
-- [ ] Permission denied ditangani.
-- [ ] Camera stream dihentikan setelah selesai.
+- [x] Kamera dapat diminta melalui HTTPS.
+- [x] Preview muncul.
+- [x] Permission denied ditangani.
+- [x] Camera stream dihentikan setelah selesai.
 
 ### Realtime
 
-- [ ] Participant dapat melihat status online.
-- [ ] Ready state tersinkron.
-- [ ] Start event tersinkron.
-- [ ] Capture schedule diterima.
-- [ ] Reconnect dapat dilakukan.
+- [x] Participant dapat melihat status online.
+- [x] Ready state tersinkron.
+- [x] Start event tersinkron.
+- [x] Capture schedule diterima (sekarang per-shot manual `shot_armed`, bukan `targetTimes`).
+- [x] Reconnect dapat dilakukan (rejoin manual; belum uji putus jaringan).
 
 ### Capture
 
-- [ ] Countdown muncul di kedua perangkat (dari `targetTimes`, tanpa event per-shot).
-- [ ] Foto pertama berhasil diambil.
-- [ ] Foto kedua berhasil diambil.
-- [ ] Foto ketiga berhasil diambil.
-- [ ] Foto keempat berhasil diambil.
-- [ ] Tiap shot ter-upload ke `photobooth-temp` dan `capture_ack.storagePath` diterima pasangan.
-- [ ] Slot pasangan yang gagal load tampil placeholder + `Retry load`.
-- [ ] Retake per-shot TIDAK ada; session baru sebagai pengganti.
+- [x] Countdown 5 detik muncul di kedua perangkat (dari `shot_armed`, tanpa event per-shot).
+- [x] Foto pertama berhasil diambil.
+- [x] Foto kedua berhasil diambil.
+- [x] Foto ketiga berhasil diambil.
+- [x] Foto keempat berhasil diambil.
+- [x] Tiap shot ter-upload ke `photobooth-temp` dan `capture_ack.storagePath` diterima pasangan.
+- [x] Slot pasangan yang gagal load tampil placeholder + `Retry load`.
+- [x] Retake per-shot TIDAK ada; session baru sebagai pengganti.
 
 ### Result
 
-- [ ] Foto A dan B masuk ke layout.
-- [ ] Template dapat dipilih.
-- [ ] Nama dapat ditampilkan.
-- [ ] Tanggal dapat ditampilkan.
-- [ ] Final image dapat di-download.
-- [ ] Share bekerja jika Web Share API tersedia.
+- [x] Foto A dan B masuk ke layout.
+- [x] Template dapat dipilih.
+- [x] Nama dapat ditampilkan.
+- [x] Tanggal dapat ditampilkan.
+- [x] Final image dapat di-download.
+- [x] Share bekerja jika Web Share API tersedia.
 
 ### Security
 
-- [ ] Service role key tidak ada di client bundle.
-- [ ] RLS aktif.
-- [ ] Room mutation tidak dapat dilakukan participant asing.
-- [ ] Input tervalidasi.
-- [ ] Room expired tidak dapat digunakan.
+- [x] Service role key tidak ada di client bundle.
+- [x] RLS aktif.
+- [x] Room mutation tidak dapat dilakukan participant asing.
+- [x] Input tervalidasi.
+- [x] Room expired tidak dapat digunakan.
 
 ---
 
@@ -1707,7 +1726,7 @@ Sebelum mengundang 6–10 tester:
 | Supabase | Managed DB + Realtime tanpa custom backend |
 | Vercel | Deployment Next.js dan HTTPS mudah |
 | Canvas API | Image composition tanpa server processing |
-| No WebRTC MVP | Mengurangi kompleksitas |
+| No WebRTC MVP → WebRTC P2P masuk lebih awal (permintaan user) | Live preview + suara via signaling Broadcast, STUN public, tanpa TURN |
 | No login MVP | Mengurangi friction |
 | No raw video upload | Privacy + bandwidth + cost |
 | Final image upload hanya saat user minta link (bucket `photobooth-final` privat, TTL 7 hari) | Privasi default + cost |
@@ -1715,46 +1734,20 @@ Sebelum mengundang 6–10 tester:
 
 ---
 
-# 39. Why WebRTC Is Not in MVP
+# 39. WebRTC — MASUK LEBIH AWAL (update 2026-09-11)
 
-WebRTC baru dibutuhkan jika produk ingin memberikan:
+Awalnya di luar MVP (§39 asli), tetapi diminta user saat testing dan sudah
+diimplementasikan: P2P video + suara, signaling via Broadcast Supabase
+(`call_hello`/`offer`/`answer`/`ice`/`bye`), STUN public, tanpa TURN.
 
-> "Saya bisa melihat pasangan saya secara live di layar."
+Batasan yang masih berlaku: sebagian jaringan NAT ketat bisa gagal
+tersambung. Tambah TURN server (mis. Metered/Twilio) bila gagal >10% di beta.
 
-Architecture:
+## Phase 3 — Live Experience (sisa)
 
-```text
-User A Camera
-      │
-      ▼
-    WebRTC
-      ▲
-      │
-User B Camera
-```
-
-Namun WebRTC menambah kebutuhan:
-
-- Signaling.
-- ICE candidate.
-- STUN.
-- TURN untuk sebagian jaringan.
-- Reconnect.
-- Browser compatibility.
-- Mobile behavior.
-- Privacy considerations.
-
-MVP cukup menggunakan:
-
-```text
-Supabase Realtime
-      +
-Local Camera
-      +
-Canvas
-```
-
-WebRTC masuk fase berikutnya setelah core experience tervalidasi.
+- Audio cue.
+- Animated countdown.
+- Reconnect improvements (call + capture).
 
 ---
 
@@ -1821,24 +1814,22 @@ WebRTC masuk fase berikutnya setelah core experience tervalidasi.
 
 ---
 
-# 42. Definition of Done — MVP
+# 42. Definition of Done — MVP (status 2026-09-11)
 
-MVP dianggap selesai jika:
-
-- [ ] Semua P0 backlog selesai.
-- [ ] Acceptance criteria utama lulus.
-- [ ] Diuji pada minimal dua perangkat berbeda.
-- [ ] Tidak ada credential sensitif di client bundle.
-- [ ] Room lifecycle berjalan.
-- [ ] Cleanup berjalan.
-- [ ] Download bekerja di Android Chrome.
-- [ ] Download bekerja di iOS Safari.
-- [ ] Disconnect/reconnect dasar tertangani.
-- [ ] Dua participant dapat menyelesaikan 4-shot session.
-- [ ] Final photobooth image berhasil dibuat.
-- [ ] 2 template tersedia.
+- [x] Semua P0 backlog selesai (kode; pg_cron belum dijadwalkan).
+- [x] Acceptance criteria utama lulus (kecuali uji tolak ke-3 eksplisit).
+- [x] Diuji pada minimal dua perangkat berbeda (laptop + HP via ngrok).
+- [x] Tidak ada credential sensitif di client bundle.
+- [x] Room lifecycle berjalan.
+- [ ] Cleanup berjalan (kode deployed; pg_cron per jam BELUM dijadwalkan).
+- [ ] Download bekerja di Android Chrome (belum diuji — baru 1 HP).
+- [ ] Download bekerja di iOS Safari (belum diuji).
+- [ ] Disconnect/reconnect dasar tertangani (rejoin manual ada; belum uji putus jaringan).
+- [x] Dua participant dapat menyelesaikan 4-shot session.
+- [x] Final photobooth image berhasil dibuat.
+- [x] 2 template tersedia.
 - [ ] 6–10 beta tester dapat menggunakan aplikasi tanpa bantuan developer untuk alur normal.
-- [ ] Feedback dikumpulkan setelah sesi.
+- [x] Feedback dikumpulkan setelah sesi (prompt kualitatif di result; belum ada tester).
 
 ---
 

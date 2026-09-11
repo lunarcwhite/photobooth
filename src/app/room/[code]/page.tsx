@@ -23,7 +23,6 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   const [mounted, setMounted] = useState(false);
   const [shareLink, setShareLink] = useState(`/room/${code}`);
   const [members, setMembers] = useState<Member[]>([]);
-  const [roomStatus, setRoomStatus] = useState<string>("memuat...");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -113,7 +112,6 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         const r = await roomApi.get(code);
         if (cancelled) return;
         setMembers(r.members);
-        setRoomStatus(r.status);
         setExpiresAt(r.expiresAt);
         if (r.status === "expired" || r.status === "completed") {
           cam.stop();
@@ -294,29 +292,41 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">ROOM {code}</h1>
-        <span className="text-xs text-zinc-500">{connected}</span>
+      <div className="pop-in flex items-center justify-between">
+        <h1 className="font-display text-2xl font-bold tracking-tight">
+          <span className="rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 px-3 py-1 text-white shadow-[0_3px_0_#9d174d]">
+            {code}
+          </span>
+        </h1>
+        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+          ● {connected}
+        </span>
       </div>
 
       <ErrorMsg msg={error} />
 
-      <Card>
-        <div className="flex flex-col gap-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span>
-              👤 {bundle.displayName} {iAmHost ? "(host)" : ""}
-            </span>
+      <Card className="pop-in pop-in-1">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-fuchsia-500 text-xl shadow-[0_3px_0_#9d174d]" aria-hidden>
+            {iAmHost ? "👑" : "💌"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display truncate text-base">
+              {bundle.displayName} {iAmHost ? "· host" : ""}
+            </p>
             <Dot on={cameraReady} label={cameraReady ? "Kamera siap" : "Kamera belum"} />
           </div>
-          <div className="flex items-center justify-between">
-            <span>👤 {partner ? partner.displayName : "Menunggu pasangan..."}</span>
+        </div>
+        <div className="mt-3 flex items-center gap-3 border-t-2 border-dashed border-pink-100 pt-3 dark:border-pink-950">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-orange-400 text-xl shadow-[0_3px_0_#b45309]" aria-hidden>
+            💕
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display truncate text-base">
+              {partner ? partner.displayName : "Menunggu pasangan..."}
+            </p>
             <Dot on={Boolean(partnerPeer)} label={partnerPeer ? "Online" : "Offline"} />
           </div>
-          <p className="text-xs text-zinc-500">
-            Status: {roomStatus}
-            {expiresAt ? ` · kedaluwarsa ${new Date(expiresAt).toLocaleString("id-ID")}` : ""}
-          </p>
         </div>
       </Card>
 
@@ -340,46 +350,57 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         <button
           type="button"
           onClick={cam.toggleMute}
-          className="w-full rounded-2xl border border-zinc-300 px-5 py-2.5 text-sm font-medium dark:border-zinc-700"
+          className={`font-display pop-in w-full rounded-2xl border-2 px-5 py-2.5 text-sm transition active:translate-y-[2px] ${
+            cam.muted
+              ? "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+              : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+          }`}
         >
           {cam.muted ? "🔇 Mic mati — ketuk untuk bicara" : "🎙️ Mic nyala — ketuk untuk bisu"}
         </button>
       )}
 
       {cam.status === "requesting" ? (
-        <p className="text-center text-sm text-zinc-500">Membuka kamera...</p>
+        <p className="text-center text-sm font-semibold text-zinc-500">Membuka kamera... 📷</p>
       ) : cam.status === "idle" || cam.status === "error" || cam.status === "denied" || cam.status === "unsupported" ? (
-        <Card>
-          <div className="flex flex-col gap-3">
-            {cam.message && <p className="text-sm text-zinc-600 dark:text-zinc-400">{cam.message}</p>}
+        <Card className="pop-in text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-400 to-fuchsia-500 text-3xl shadow-[0_4px_0_#6d28d9]" aria-hidden>
+            📷
+          </div>
+          <div className="mt-3 flex flex-col gap-3">
+            {cam.message && <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">{cam.message}</p>}
             <Btn onClick={() => cam.start().then((ok) => ok && track("camera_ready", bundle.roomId))}>
-              {cam.status === "idle" ? "Aktifkan Kamera" : "Coba Lagi"}
+              {cam.status === "idle" ? "Aktifkan Kamera 📷" : "Coba Lagi 🔄"}
             </Btn>
             <p className="text-xs text-zinc-500">Kamera hanya dipakai selama sesi dan tidak merekam video.</p>
           </div>
         </Card>
       ) : null}
 
-      <Card>
-        <p className="text-sm font-medium">Bagikan link ini ke pasanganmu:</p>
-        <p className="mt-1 break-all rounded-xl bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900">{shareLink}</p>
-        <div className="mt-3">
-          <GhostBtn onClick={copyLink}>{copied ? "Tersalin!" : "Salin Link"}</GhostBtn>
-        </div>
+      <Card className="pop-in pop-in-2">
+        <p className="font-display text-sm">💌 Bagikan link ini ke pasanganmu:</p>
+        <button
+          type="button"
+          onClick={copyLink}
+          className="mt-2 w-full break-all rounded-2xl border-2 border-dashed border-pink-300 bg-pink-50 px-3 py-2.5 text-sm font-bold text-pink-700 transition active:scale-[0.99] dark:border-pink-800 dark:bg-pink-950 dark:text-pink-300"
+        >
+          {copied ? "✅ Tersalin!" : shareLink}
+        </button>
+        <p className="mt-1.5 text-center text-[11px] text-zinc-500">Ketuk link untuk menyalin · kedaluwarsa {expiresAt ? new Date(expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
       </Card>
 
       {iAmHost ? (
         <>
-          <Btn onClick={doStart} disabled={!bothCamerasReady || starting || !cameraReady}>
-            {starting ? "Memulai..." : bothCamerasReady ? "MULAI SESI FOTO" : "Menunggu pasangan siap..."}
+          <Btn onClick={doStart} disabled={!bothCamerasReady || starting || !cameraReady} className="pop-in pop-in-3 text-xl">
+            {starting ? "Memulai... 🚀" : bothCamerasReady ? "MULAI SESI FOTO 📸" : "Menunggu pasangan siap... ⏳"}
           </Btn>
-          <button onClick={doEnd} disabled={ending} className="text-center text-sm text-zinc-500 disabled:opacity-50">
+          <button onClick={doEnd} disabled={ending} className="text-center text-sm font-semibold text-zinc-400 disabled:opacity-50">
             {ending ? "Mengakhiri..." : "Akhiri room"}
           </button>
         </>
       ) : (
-        <p className="rounded-2xl bg-zinc-100 px-4 py-3 text-center text-sm dark:bg-zinc-900">
-          {bothCamerasReady ? "Siap! Menunggu host menekan mulai..." : "Menunggu host memulai sesi..."}
+        <p className="pop-in rounded-2xl border-2 border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-bold text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300">
+          {bothCamerasReady ? "✨ Siap! Menunggu host menekan mulai..." : "⏳ Menunggu host memulai sesi..."}
         </p>
       )}
     </main>

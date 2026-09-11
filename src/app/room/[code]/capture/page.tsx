@@ -361,15 +361,24 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 py-6">
-      <h1 className="text-center text-lg font-bold">Sesi Foto — {code}</h1>
+      <div className="pop-in flex items-center justify-center gap-2">
+        <span className="font-display rounded-full bg-gradient-to-r from-pink-500 to-fuchsia-500 px-4 py-1 text-sm text-white shadow-[0_3px_0_#9d174d]">
+          📸 {doneCount}/4 foto
+        </span>
+        {shots.some((s) => s.uploading) && (
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            mengunggah...
+          </span>
+        )}
+      </div>
       <ErrorMsg msg={error} />
       {tabHidden && (
-        <p role="alert" className="rounded-xl bg-amber-50 px-4 py-2.5 text-center text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p role="alert" className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-sm font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
           Tab tidak aktif — kembali ke tab ini agar countdown tetap akurat.
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="pop-in pop-in-1 grid grid-cols-2 gap-3">
         <CameraView
           videoRef={cam.videoRef}
           ready={cameraReady}
@@ -389,37 +398,51 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         <button
           type="button"
           onClick={cam.toggleMute}
-          className="w-full rounded-2xl border border-zinc-300 px-5 py-2.5 text-sm font-medium dark:border-zinc-700"
+          className={`font-display w-full rounded-2xl border-2 px-5 py-2.5 text-sm transition active:translate-y-[2px] ${
+            cam.muted
+              ? "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+              : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+          }`}
         >
           {cam.muted ? "🔇 Mic mati — ketuk untuk bicara" : "🎙️ Mic nyala — ketuk untuk bisu"}
         </button>
       )}
 
-      <div className="rounded-3xl border border-zinc-200 p-5 text-center dark:border-zinc-800">
+      <div className="rounded-3xl border-2 border-white bg-white/85 p-5 text-center shadow-[0_6px_24px_-8px_rgba(219,39,119,0.35)] backdrop-blur dark:border-white/10 dark:bg-zinc-900/85">
         {!cameraReady ? (
-          <p className="text-sm text-zinc-500">Menyiapkan kamera...</p>
+          <p className="text-sm font-semibold text-zinc-500">Menyiapkan kamera... 📷</p>
         ) : armedIndex >= 0 ? (
           <>
-            <p className="text-xs text-zinc-500">Foto {armedIndex + 1} dari 4</p>
-            <p className="mt-1 text-6xl font-bold tabular-nums" aria-live="polite">
+            <p className="font-display text-sm text-pink-600 dark:text-pink-300">Foto {armedIndex + 1} dari 4 — bersiap!</p>
+            <p
+              key={armedIndex}
+              className="countdown-num font-display mt-1 bg-gradient-to-r from-pink-600 via-rose-500 to-amber-500 bg-clip-text text-7xl font-bold tabular-nums text-transparent"
+              aria-live="polite"
+            >
               {countdown}
             </p>
-            <p className="mt-1 text-sm text-zinc-500">Bersiap... foto diambil otomatis</p>
+            <div className="mx-auto mt-2 h-2.5 w-40 overflow-hidden rounded-full bg-pink-100 dark:bg-pink-950">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-pink-500 to-amber-400 transition-[width] duration-100"
+                style={{ width: `${Math.min(100, Math.max(0, (armedRemaining / 5000) * 100))}%` }}
+              />
+            </div>
           </>
         ) : allDone ? (
           <>
-            <p className="text-lg font-semibold">Semua 4 foto selesai!</p>
+            <p className="text-4xl" aria-hidden>🎉</p>
+            <p className="font-display mt-1 text-lg">Semua 4 foto selesai!</p>
             <p className="mt-1 text-sm text-zinc-500">
               Foto pasangan yang belum tiba tampil sebagai placeholder dan bisa dimuat ulang di halaman hasil.
             </p>
           </>
         ) : (
           <>
-            <p className="text-xs text-zinc-500">
-              {doneCount} dari 4 foto selesai {shots.some((s) => s.uploading) ? "· mengunggah..." : ""}
+            <p className="font-display text-base">
+              {isHost ? "📸 Siap? Tekan tombol foto!" : "⏳ Menunggu host menekan tombol..."}
             </p>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              {isHost ? "Tekan tombol foto berikutnya saat kalian siap berpose." : "Menunggu host menekan tombol foto..."}
+            <p className="mt-1 text-sm text-zinc-500">
+              {isHost ? "Pose dulu bareng, baru tekan saat momennya pas." : "Siapkan pose terbaikmu!"}
             </p>
           </>
         )}
@@ -428,19 +451,25 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       <div className="grid grid-cols-2 gap-2">
         {[0, 1, 2, 3].map((i) => {
           const s = shots[i];
-          const label = s.done ? `Foto ${i + 1} ✓` : `Ambil Foto ${i + 1}`;
           return isHost ? (
             <Btn
               key={i}
               onClick={() => armShot(i)}
               disabled={!cameraReady || s.done || s.armedAt !== null || armedIndex >= 0 || arming}
+              className={s.done ? "from-emerald-500 via-emerald-500 to-teal-500 shadow-[0_4px_0_#065f46]" : ""}
             >
-              {s.armedAt !== null && !s.done ? `${Math.ceil(Math.max(0, ((s.armedAt as number) - now)) / 1000)}...` : arming ? "..." : label}
+              {s.done
+                ? `Foto ${i + 1} ✓`
+                : s.armedAt !== null
+                  ? `${Math.ceil(Math.max(0, ((s.armedAt as number) - now)) / 1000)}...`
+                  : arming
+                    ? "..."
+                    : `📸 Foto ${i + 1}`}
             </Btn>
           ) : (
             <div
               key={i}
-              className={`rounded-2xl px-5 py-3.5 text-center text-base font-semibold ${s.done ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-900"}`}
+              className={`font-display rounded-2xl border-2 px-5 py-3.5 text-center text-base ${s.done ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "border-violet-200 bg-white/70 text-zinc-500 dark:border-violet-900 dark:bg-zinc-900/70"}`}
             >
               {s.done ? `Foto ${i + 1} ✓` : `Foto ${i + 1}`}
             </div>
@@ -452,23 +481,27 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`aspect-square overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 ${shots[i].done ? "ring-2 ring-green-500" : ""}`}
+            className={`aspect-square overflow-hidden rounded-2xl border-2 bg-white/70 dark:bg-zinc-900/70 ${shots[i].done ? "pop-in border-emerald-300 shadow-[0_3px_0_#059669]" : "border-white"}`}
           >
             {myShots[i] ? (
               // eslint-disable-next-line @next/next/no-img-element -- data: URL jepretan lokal; next/image tidak bisa optimasi
               <img src={myShots[i]!} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
-            ) : null}
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xl text-zinc-300" aria-hidden>
+                {i + 1}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {allDone && (
-        <GhostBtn onClick={finish} disabled={finishing}>
-          {finishing ? "Menyiapkan hasil..." : "Lihat Hasil"}
+        <GhostBtn onClick={finish} disabled={finishing} className="pop-in text-lg">
+          {finishing ? "Menyiapkan hasil... ✨" : "Lihat Hasil 🎉"}
         </GhostBtn>
       )}
 
-      <button onClick={() => router.push(`/room/${code}`)} className="text-center text-sm text-zinc-500">
+      <button onClick={() => router.push(`/room/${code}`)} className="text-center text-sm font-semibold text-zinc-400">
         Kembali ke ruang tunggu
       </button>
     </main>

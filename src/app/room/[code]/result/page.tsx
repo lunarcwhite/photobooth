@@ -161,27 +161,34 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 py-6">
-      <h1 className="text-center text-lg font-bold">Hasil Foto — {code}</h1>
+      <div className="pop-in text-center">
+        <p className="text-4xl" aria-hidden>🎉</p>
+        <h1 className="font-display mt-1 text-2xl font-bold">
+          <span className="bg-gradient-to-r from-pink-600 via-rose-500 to-fuchsia-600 bg-clip-text text-transparent">
+            Hasil Foto Kalian!
+          </span>
+        </h1>
+      </div>
       <ErrorMsg msg={error} />
 
-      <div className="flex gap-2">
+      <div className="pop-in pop-in-1 flex gap-2">
         {TEMPLATES.map((t, i) => (
           <button
             key={t.id}
             onClick={() => setTplIndex(i)}
-            className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-medium ${i === tplIndex ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900" : "border-zinc-300 dark:border-zinc-700"}`}
+            className={`font-display flex-1 rounded-2xl border-2 px-4 py-2.5 text-sm transition active:translate-y-[2px] ${i === tplIndex ? "border-transparent bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white shadow-[0_3px_0_#9d174d]" : "border-violet-200 bg-white/70 text-zinc-600 dark:border-violet-900 dark:bg-zinc-900/70 dark:text-zinc-300"}`}
           >
-            {t.name}
+            {i === 0 ? "🎞️ " : "⬛ "}{t.name}
           </button>
         ))}
       </div>
 
-      <Card>
+      <Card className="pop-in pop-in-2">
         {composing && !finalUrl ? (
-          <p className="py-10 text-center text-sm text-zinc-500">Menyusun foto...</p>
+          <p className="py-10 text-center text-sm font-semibold text-zinc-500">Menyusun foto... ✨</p>
         ) : finalUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- blob: URL hasil compose; next/image tidak bisa optimasi
-          <img src={finalUrl} alt="Hasil photobooth" className="w-full rounded-xl" />
+          <img src={finalUrl} alt="Hasil photobooth" className="w-full rounded-2xl border-2 border-pink-100 dark:border-pink-950" />
         ) : null}
       </Card>
 
@@ -189,32 +196,32 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
         {partnerShots.map((s, i) =>
           s ? (
             // eslint-disable-next-line @next/next/no-img-element -- blob: URL unduhan pasangan; next/image tidak bisa optimasi
-            <img key={i} src={s} alt={`Pasangan ${i + 1}`} className="aspect-square w-full rounded-xl object-cover" />
+            <img key={i} src={s} alt={`Pasangan ${i + 1}`} className="aspect-square w-full rounded-2xl border-2 border-emerald-200 object-cover dark:border-emerald-900" />
           ) : (
             <button
               key={i}
               onClick={() => loadPartner(i)}
               disabled={loading[i] || !shots.partnerPaths[i]}
-              className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl bg-zinc-800 text-[11px] text-zinc-300 disabled:opacity-50"
+              className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-zinc-300 bg-white/60 text-[11px] font-bold text-zinc-500 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900/60"
             >
-              {loading[i] ? "Memuat..." : shots.partnerPaths[i] ? "Muat Ulang" : "Menunggu..."}
+              {loading[i] ? "Memuat..." : shots.partnerPaths[i] ? "🔄 Muat Ulang" : "Menunggu..."}
             </button>
           ),
         )}
       </div>
 
-      <Btn onClick={download} disabled={!finalBlob}>
-        Unduh Hasil
+      <Btn onClick={download} disabled={!finalBlob} className="pop-in">
+        ⬇️ Unduh Hasil
       </Btn>
       <GhostBtn onClick={share} disabled={!finalBlob}>
-        {shared ? "Sudah Dibagikan!" : "Bagikan"}
+        {shared ? "✅ Sudah Dibagikan!" : "💌 Bagikan"}
       </GhostBtn>
       {!canShare && (
         <p className="text-center text-xs text-zinc-500">Browser tidak mendukung berbagi langsung — gunakan Unduh.</p>
       )}
 
       <Card>
-        <p className="text-sm font-medium">Suka hasilnya?</p>
+        <p className="font-display text-sm">💕 Suka hasilnya?</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
           <li>Apakah terasa benar-benar foto bersama?</li>
           <li>Apakah countdown terasa sinkron?</li>
@@ -223,7 +230,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
         <p className="mt-2 text-xs text-zinc-500">Kirim masukanmu ke penyelenggara beta 💕</p>
       </Card>
 
-      <GhostBtn onClick={() => router.push("/")}>Buat Room Baru</GhostBtn>
+      <GhostBtn onClick={() => router.push("/")}>🎟️ Buat Room Baru</GhostBtn>
     </main>
   );
 }

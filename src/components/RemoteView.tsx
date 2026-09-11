@@ -31,7 +31,7 @@ export function RemoteView({
   const showVideo = remoteStream !== null && status === "connected";
 
   return (
-    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-zinc-900">
+    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border-[3px] border-white bg-zinc-900 shadow-[0_6px_16px_-6px_rgba(124,58,237,0.5)] dark:border-white/15">
       <video
         ref={ref}
         autoPlay
@@ -40,22 +40,22 @@ export function RemoteView({
       />
       {!showVideo && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-3 text-center text-zinc-400">
-          <span className="text-2xl">📷</span>
-          <span className="text-xs">
+          <span className="text-3xl" aria-hidden>📷</span>
+          <span className="text-xs font-semibold">
             {status === "calling" ? "Menghubungkan video..." : status === "failed" ? "Video gagal tersambung." : "Menunggu video pasangan..."}
           </span>
           {status === "failed" && (
             <button
               type="button"
               onClick={onRetry}
-              className="mt-1 rounded-full bg-zinc-700 px-3 py-1 text-xs font-medium text-white"
+              className="font-display mt-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3 py-1 text-xs text-white"
             >
-              Coba Lagi
+              🔄 Coba Lagi
             </button>
           )}
         </div>
       )}
-      <div className="absolute bottom-2 left-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
+      <div className="font-display absolute bottom-2 left-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3 py-1 text-xs text-white shadow">
         {name}
       </div>
     </div>

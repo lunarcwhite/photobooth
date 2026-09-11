@@ -1,12 +1,21 @@
 # Product Requirements Document (PRD)
 # LDR Photobooth — MVP Private Beta
 
-**Version:** 1.3
-**Status:** In development — backend live, frontend tested 2-device via ngrok
+**Version:** 1.4
+**Status:** In development — backend live, UI playful pop, tested 2-device via ngrok
 **Target beta:** 6–10 pengguna / beberapa pasangan
 **Platform:** Web, mobile-first
 **Deployment target:** Free-tier / serverless
 **Recommended stack:** Next.js + TypeScript + Tailwind CSS + Supabase + Vercel
+
+### Changelog 1.3 → 1.4 (UI/UX polish — playful pop)
+- Identitas visual: font Fredoka (display) + Nunito (body), background candy blobs, dark-mode playful.
+- Design system di `ui.tsx`: tombol gradient pink + hard offset shadow + press, field/card/error/dot pop, animasi pop-in + countdown zoom + progress bar + float (hormat reduced-motion).
+- Landing: hero + langkah 1-2-3 + tab Buat/Gabung, kode room monospace lebar.
+- Waiting: badge kode gradient, kartu peserta beravatar, share-link ketuk-untuk-salinan, tombol MULAI chunky.
+- Capture: badge progres 📸 n/4, countdown gradient zoom + progress bar, tombol foto chunky (hijau saat selesai), thumbnail bernomor.
+- Result: judul gradient, tombol template berikon, bingkai hasil pink, tombol unduh/bagi berikon.
+- Video berbingkai putih + label gradient (Kamu pink, pasangan violet).
 
 ### Changelog 1.2 → 1.3
 - Capture otomatis (`targetTimes[4]` dari server) DIGANTI capture manual: host tekan tombol per foto → broadcast `shot_armed {sequence, targetAt = correctedNow + 5000ms}` → kedua HP countdown 5→1 → jepret bareng. Jadwal server tidak dipakai lagi.

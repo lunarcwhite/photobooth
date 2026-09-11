@@ -1,16 +1,18 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { roomApi, RoomApiError, type Member } from "@/lib/room/api";
 import { normalizeCode, validateDisplayName } from "@/lib/room/session";
 import { loadRoomBundle, saveRoomBundle, saveCaptureBundle, loadCaptureBundle, type RoomBundle } from "@/lib/room/bundle";
 import { useCamera } from "@/hooks/useCamera";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
+import { usePeerCall } from "@/hooks/usePeerCall";
 import { track } from "@/lib/analytics/events";
 import type { RoomBroadcastEvent } from "@/types/realtime";
 import { Btn, GhostBtn, Field, Card, ErrorMsg, Dot } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
+import { RemoteView } from "@/components/RemoteView";
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = use(params);
@@ -47,6 +49,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     [code, router],
   );
 
+  const callSignalRef = useRef<(e: RoomBroadcastEvent) => void>(() => {});
+
   const onEvent = useCallback(
     (e: RoomBroadcastEvent) => {
       if (e.event === "session_started") {
@@ -55,11 +59,29 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
       } else if (e.event === "room_ended") {
         setError("Host mengakhiri room ini.");
       }
+      callSignalRef.current(e);
     },
     [bundle?.roomId, goCapture],
   );
 
   const { peers, connected, send } = useRoomChannel(code, me, onEvent);
+
+  // P2P call: host menawarkan, guest menjawab. Jalan saat kamera siap.
+  const callPeerId =
+    members.find((m) => m.id !== bundle?.participantId)?.id ??
+    peers.find((p) => p.participantId !== bundle?.participantId)?.participantId ??
+    null;
+  const call = usePeerCall({
+    myId: bundle?.participantId ?? null,
+    peerId: callPeerId,
+    stream: cam.stream,
+    isHost: bundle?.role === "host",
+    send,
+    enabled: mounted && !!bundle && cameraReady,
+  });
+  useEffect(() => {
+    callSignalRef.current = call.handleSignal;
+  });
 
   // Baca storage + origin setelah mount: sinkronisasi React ↔ browser
   // storage setelah SSR. Server dan client render shell yang sama.
@@ -246,13 +268,31 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         </div>
       </Card>
 
-      <CameraView
-        videoRef={cam.videoRef}
-        ready={cameraReady}
-        label="Kamu"
-        mirrored={cam.mirrored}
-        onToggleMirror={cam.toggleMirror}
-      />
+      <div className="grid grid-cols-2 gap-3">
+        <CameraView
+          videoRef={cam.videoRef}
+          ready={cameraReady}
+          label="Kamu"
+          mirrored={cam.mirrored}
+          onToggleMirror={cam.toggleMirror}
+        />
+        <RemoteView
+          remoteStream={call.remoteStream}
+          status={call.status}
+          name={partner?.displayName ?? "Pasangan"}
+          onRetry={call.retry}
+        />
+      </div>
+
+      {cameraReady && cam.audioOn && (
+        <button
+          type="button"
+          onClick={cam.toggleMute}
+          className="w-full rounded-2xl border border-zinc-300 px-5 py-2.5 text-sm font-medium dark:border-zinc-700"
+        >
+          {cam.muted ? "🔇 Mic mati — ketuk untuk bicara" : "🎙️ Mic nyala — ketuk untuk bisu"}
+        </button>
+      )}
 
       {cam.status === "requesting" ? (
         <p className="text-center text-sm text-zinc-500">Membuka kamera...</p>

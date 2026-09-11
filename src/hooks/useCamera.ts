@@ -4,14 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type CameraStatus = "idle" | "requesting" | "ready" | "denied" | "unsupported" | "error";
 
-// Camera hook (FR-03). Ada tombol Cermin/Normal: preview dan file selalu sama.
-// Default Cermin (seperti aplikasi selfie): angkat kanan → kanan layar naik.
+// Camera hook (FR-03 + call). Video + mic untuk P2P call.
+// Ada tombol Cermin/Normal: preview dan file selalu sama.
 // Stream is stopped on unmount or via stop().
 export function useCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [muted, setMuted] = useState(false);
+  const [audioOn, setAudioOn] = useState(false);
   // Mirror selfie seperti cermin, tersimpan per-browser. Default nyala.
   // Dibaca di effect (bukan saat render) agar SSR dan client sama.
   const [mirrored, setMirrored] = useState<boolean>(true);
@@ -43,6 +46,9 @@ export function useCamera() {
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    setStream(null);
+    setAudioOn(false);
+    setMuted(false);
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
@@ -55,7 +61,10 @@ export function useCamera() {
     setStatus("requesting");
     setMessage(null);
     stop();
+    // Video + mic untuk saling lihat + bicara (P2P call).
     const tries: MediaStreamConstraints[] = [
+      { video: { facingMode: "user" }, audio: true },
+      { video: true, audio: true },
       { video: { facingMode: "user" }, audio: false },
       { video: true, audio: false },
     ];
@@ -63,9 +72,16 @@ export function useCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = stream;
+        setStream(stream);
+        const hasAudio = stream.getAudioTracks().length > 0;
+        setAudioOn(hasAudio);
+        setMuted(false);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
+        }
+        if (!hasAudio) {
+          setMessage("Mikrofon tidak tersedia — panggilan jalan tanpa suara. Video tetap tampil.");
         }
         setStatus("ready");
         return true;
@@ -73,7 +89,7 @@ export function useCamera() {
         const name = e instanceof DOMException ? e.name : "";
         if (name === "NotAllowedError" || name === "SecurityError") {
           setStatus("denied");
-          setMessage("Izin kamera ditolak. Izinkan akses kamera di pengaturan browser, lalu coba lagi.");
+          setMessage("Izin kamera/mic ditolak. Izinkan akses di pengaturan browser, lalu coba lagi.");
           return false;
         }
         // try next fallback
@@ -83,6 +99,19 @@ export function useCamera() {
     setMessage("Kamera tidak bisa dibuka. Pastikan tidak dipakai aplikasi lain, lalu coba lagi.");
     return false;
   }, [stop]);
+
+  // Mute mic lokal (track tetap hidup agar peer tidak renegosiasi).
+  const toggleMute = useCallback(() => {
+    const s = streamRef.current;
+    if (!s) return;
+    setMuted((m) => {
+      const next = !m;
+      s.getAudioTracks().forEach((t) => {
+        t.enabled = !next;
+      });
+      return next;
+    });
+  }, []);
 
   useEffect(() => stop, [stop]);
 
@@ -110,5 +139,5 @@ export function useCamera() {
     [mirrored],
   );
 
-  return { videoRef, status, message, start, stop, captureShot, mirrored, toggleMirror };
+  return { videoRef, status, message, start, stop, captureShot, mirrored, toggleMirror, stream, muted, toggleMute, audioOn };
 }

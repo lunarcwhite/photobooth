@@ -6,11 +6,13 @@ import { normalizeCode } from "@/lib/room/session";
 import { loadRoomBundle, loadCaptureBundle, saveShotsBundle, type RoomBundle, type CaptureBundle } from "@/lib/room/bundle";
 import { useCamera } from "@/hooks/useCamera";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
+import { usePeerCall } from "@/hooks/usePeerCall";
 import { uploadShot, blobToDataURL } from "@/lib/storage/exchange";
 import { track } from "@/lib/analytics/events";
 import type { RoomBroadcastEvent } from "@/types/realtime";
 import { Btn, GhostBtn, ErrorMsg } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
+import { RemoteView } from "@/components/RemoteView";
 import { getServerOffset, correctedNow } from "@/lib/realtime/clock";
 import { supabase } from "@/lib/supabase/client";
 import { roomApi } from "@/lib/room/api";
@@ -53,6 +55,8 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const [finishing, setFinishing] = useState(false);
   const [arming, setArming] = useState(false);
   const [partnerName, setPartnerName] = useState("Pasangan");
+  const [callPeerId, setCallPeerId] = useState<string | null>(null);
+  const callSignalRef = useRef<(e: RoomBroadcastEvent) => void>(() => {});
   const bgQueue = useRef<{ seq: number; blob: Blob; tries: number }[]>([]);
   const firedRef = useRef<boolean[]>([false, false, false, false]);
 
@@ -105,9 +109,23 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     } else if (e.event === "session_finished") {
       finishLocal();
     }
+    callSignalRef.current(e);
   }
 
   const { send } = useRoomChannel(code, me, onEvent);
+
+  // P2P call berlanjut dari ruang tunggu (peer id dikenali via presence/get).
+  const call = usePeerCall({
+    myId: bundle?.participantId ?? null,
+    peerId: callPeerId,
+    stream: cam.stream,
+    isHost: bundle?.role === "host",
+    send,
+    enabled: mounted && !!bundle && cameraReady,
+  });
+  useEffect(() => {
+    callSignalRef.current = call.handleSignal;
+  });
 
   // Baca storage setelah mount: sinkronisasi React ↔ browser storage.
   /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi mount ↔ storage browser, sah */
@@ -139,7 +157,10 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     roomApi.get(code).then(
       (r) => {
         const other = r.members.find((m) => m.id !== bundle?.participantId);
-        if (other) setPartnerName(other.displayName);
+        if (other) {
+          setPartnerName(other.displayName);
+          setCallPeerId(other.id);
+        }
       },
       () => {},
     );
@@ -324,16 +345,23 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
           mirrored={cam.mirrored}
           onToggleMirror={cam.toggleMirror}
         />
-        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-zinc-900">
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-zinc-400">
-            <span className="text-2xl">📷</span>
-            <span className="px-3 text-center text-xs">{partnerName} — foto muncul setelah tiap shot</span>
-          </div>
-          <div className="absolute bottom-2 left-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
-            {partnerName}
-          </div>
-        </div>
+        <RemoteView
+          remoteStream={call.remoteStream}
+          status={call.status}
+          name={partnerName}
+          onRetry={call.retry}
+        />
       </div>
+
+      {cameraReady && cam.audioOn && (
+        <button
+          type="button"
+          onClick={cam.toggleMute}
+          className="w-full rounded-2xl border border-zinc-300 px-5 py-2.5 text-sm font-medium dark:border-zinc-700"
+        >
+          {cam.muted ? "🔇 Mic mati — ketuk untuk bicara" : "🎙️ Mic nyala — ketuk untuk bisu"}
+        </button>
+      )}
 
       <div className="rounded-3xl border border-zinc-200 p-5 text-center dark:border-zinc-800">
         {!cameraReady ? (

@@ -34,12 +34,41 @@ export interface RoomEndedEvent {
   event: "room_ended";
 }
 
+// WebRTC signaling (P2P video+suara). Pesan kecil via Broadcast yang sama.
+// `from` = participantId pengirim; penerima bukan pengirim memprosesnya.
+export interface CallOfferEvent {
+  event: "call_offer";
+  from: string;
+  sdp: string;
+}
+
+export interface CallAnswerEvent {
+  event: "call_answer";
+  from: string;
+  sdp: string;
+}
+
+export interface CallIceEvent {
+  event: "call_ice";
+  from: string;
+  candidate: string;
+}
+
+export interface CallByeEvent {
+  event: "call_bye";
+  from: string;
+}
+
 export type RoomBroadcastEvent =
   | SessionStartedEvent
   | ShotArmedEvent
   | CaptureAckEvent
   | SessionFinishedEvent
-  | RoomEndedEvent;
+  | RoomEndedEvent
+  | CallOfferEvent
+  | CallAnswerEvent
+  | CallIceEvent
+  | CallByeEvent;
 
 export type AnalyticsEvent =
   | "room_created"

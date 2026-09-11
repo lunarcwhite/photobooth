@@ -3,14 +3,14 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizeCode } from "@/lib/room/session";
-import { loadRoomBundle, loadCaptureBundle, saveShotsBundle, type RoomBundle, type CaptureBundle } from "@/lib/room/bundle";
+import { loadRoomBundle, loadCaptureBundle, clearRoomBundle, clearCaptureBundle, saveShotsBundle, type RoomBundle, type CaptureBundle } from "@/lib/room/bundle";
 import { useCamera } from "@/hooks/useCamera";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { usePeerCall } from "@/hooks/usePeerCall";
 import { uploadShot, blobToDataURL } from "@/lib/storage/exchange";
 import { track } from "@/lib/analytics/events";
 import type { RoomBroadcastEvent } from "@/types/realtime";
-import { Btn, GhostBtn, ErrorMsg } from "@/components/ui";
+import { Btn, GhostBtn, Card, ErrorMsg } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
 import { RemoteView } from "@/components/RemoteView";
 import { getServerOffset, correctedNow } from "@/lib/realtime/clock";
@@ -56,6 +56,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const [arming, setArming] = useState(false);
   const [partnerName, setPartnerName] = useState("Pasangan");
   const [callPeerId, setCallPeerId] = useState<string | null>(null);
+  const [endedByHost, setEndedByHost] = useState(false);
   const callSignalRef = useRef<(e: RoomBroadcastEvent) => void>(() => {});
   const bgQueue = useRef<{ seq: number; blob: Blob; tries: number }[]>([]);
   const firedRef = useRef<boolean[]>([false, false, false, false]);
@@ -108,6 +109,9 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       });
     } else if (e.event === "session_finished") {
       finishLocal();
+    } else if (e.event === "room_ended") {
+      cam.stop();
+      setEndedByHost(true);
     }
     callSignalRef.current(e);
   }
@@ -323,6 +327,34 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
         <p className="text-center text-sm text-zinc-500">Menyiapkan sesi foto...</p>
+      </main>
+    );
+  }
+
+  if (endedByHost) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
+        <Card>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p className="text-4xl" aria-hidden>
+              👋
+            </p>
+            <h1 className="text-xl font-bold">Room {code} berakhir</h1>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Host mengakhiri room ini. Terima kasih sudah mampir!
+            </p>
+            <Btn
+              onClick={() => {
+                clearRoomBundle(code);
+                clearCaptureBundle(code);
+                cam.stop();
+                router.push("/");
+              }}
+            >
+              Kembali ke Beranda
+            </Btn>
+          </div>
+        </Card>
       </main>
     );
   }

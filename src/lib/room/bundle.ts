@@ -51,7 +51,21 @@ export const shotsKey = (code: string) => `ldr_shots_${code}`;
 
 export const loadRoomBundle = (code: string): RoomBundle | null => get(bundleKey(code));
 export const saveRoomBundle = (code: string, b: RoomBundle) => set(bundleKey(code), b);
+export const clearRoomBundle = (code: string) => {
+  try {
+    store()?.removeItem(bundleKey(code));
+  } catch {
+    /* abaikan */
+  }
+};
 export const loadCaptureBundle = (code: string): CaptureBundle | null => get(captureKey(code));
 export const saveCaptureBundle = (code: string, b: CaptureBundle) => set(captureKey(code), b);
+export const clearCaptureBundle = (code: string) => {
+  try {
+    store()?.removeItem(captureKey(code));
+  } catch {
+    /* abaikan */
+  }
+};
 export const loadShotsBundle = (code: string): ShotsBundle | null => get(shotsKey(code));
 export const saveShotsBundle = (code: string, b: ShotsBundle) => set(shotsKey(code), b);

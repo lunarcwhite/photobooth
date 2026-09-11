@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { roomApi, RoomApiError, type Member } from "@/lib/room/api";
 import { normalizeCode, validateDisplayName } from "@/lib/room/session";
-import { loadRoomBundle, saveRoomBundle, saveCaptureBundle, loadCaptureBundle, type RoomBundle } from "@/lib/room/bundle";
+import { loadRoomBundle, saveRoomBundle, clearRoomBundle, saveCaptureBundle, loadCaptureBundle, clearCaptureBundle, type RoomBundle } from "@/lib/room/bundle";
 import { useCamera } from "@/hooks/useCamera";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { usePeerCall } from "@/hooks/usePeerCall";
@@ -33,6 +33,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   // dari capture). Tampilkan tombol rejoin manual, jangan auto-push agar
   // tidak bounce bolak-balik waiting ↔ capture.
   const [pendingSession, setPendingSession] = useState<{ sessionDbId: string } | null>(null);
+  // Room diakhiri host / kedaluwarsa: tampilkan layar keluar resmi.
+  const [ended, setEnded] = useState<null | { reason: "host" | "expired" | "completed" }>(null);
 
   const cam = useCamera();
   const cameraReady = cam.status === "ready";
@@ -61,10 +63,13 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         track("session_started", bundle?.roomId);
         goCapture(e.sessionId);
       } else if (e.event === "room_ended") {
-        setError("Host mengakhiri room ini.");
+        // Host mengakhiri: hentikan kamera + call, tampilkan layar keluar.
+        cam.stop();
+        setEnded({ reason: "host" });
       }
       callSignalRef.current(e);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [bundle?.roomId, goCapture],
   );
 
@@ -111,7 +116,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         setRoomStatus(r.status);
         setExpiresAt(r.expiresAt);
         if (r.status === "expired" || r.status === "completed") {
-          setError(r.status === "expired" ? "Room sudah kedaluwarsa." : "Room sudah selesai.");
+          cam.stop();
+          setEnded({ reason: r.status === "expired" ? "expired" : "completed" });
           return;
         }
         if (r.activeSession) {
@@ -218,6 +224,36 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
         <p className="text-center text-sm text-zinc-500">Memuat room...</p>
+      </main>
+    );
+  }
+
+  const leaveRoom = () => {
+    clearRoomBundle(code);
+    clearCaptureBundle(code);
+    cam.stop();
+    router.push("/");
+  };
+
+  if (ended) {
+    const text =
+      ended.reason === "host"
+        ? "Host mengakhiri room ini. Terima kasih sudah mampir!"
+        : ended.reason === "expired"
+          ? "Room sudah kedaluwarsa."
+          : "Room sudah selesai.";
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
+        <Card>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p className="text-4xl" aria-hidden>
+              👋
+            </p>
+            <h1 className="text-xl font-bold">Room {code} berakhir</h1>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">{text}</p>
+            <Btn onClick={leaveRoom}>Kembali ke Beranda</Btn>
+          </div>
+        </Card>
       </main>
     );
   }

@@ -18,18 +18,27 @@ export function RemoteView({
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
 
+  // Satu elemen video selalu di-mount. srcObject ditempel ulang tiap
+  // stream/status berubah agar tidak pernah blank saat ganti kondisi.
   useEffect(() => {
-    if (ref.current) {
-      ref.current.srcObject = remoteStream;
-      ref.current.play().catch(() => {});
+    const v = ref.current;
+    if (v && remoteStream) {
+      if (v.srcObject !== remoteStream) v.srcObject = remoteStream;
+      v.play().catch(() => {});
     }
-  }, [remoteStream]);
+  }, [remoteStream, status]);
+
+  const showVideo = remoteStream !== null && status === "connected";
 
   return (
     <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-zinc-900">
-      {remoteStream && status === "connected" ? (
-        <video ref={ref} autoPlay playsInline className="h-full w-full object-cover" />
-      ) : (
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        className={`h-full w-full object-cover ${showVideo ? "" : "hidden"}`}
+      />
+      {!showVideo && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-3 text-center text-zinc-400">
           <span className="text-2xl">📷</span>
           <span className="text-xs">
@@ -45,10 +54,6 @@ export function RemoteView({
             </button>
           )}
         </div>
-      )}
-      {/* video tetap di-mount saat calling agar track langsung tampil */}
-      {remoteStream && status !== "connected" && (
-        <video ref={ref} autoPlay playsInline muted className="hidden" />
       )}
       <div className="absolute bottom-2 left-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
         {name}

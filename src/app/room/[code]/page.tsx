@@ -40,8 +40,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   );
 
   const goCapture = useCallback(
-    (sessionDbId: string, targetTimes: [number, number, number, number]) => {
-      saveCaptureBundle(code, { sessionDbId, targetTimes });
+    (sessionDbId: string) => {
+      saveCaptureBundle(code, { sessionDbId });
       router.push(`/room/${code}/capture`);
     },
     [code, router],
@@ -51,7 +51,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     (e: RoomBroadcastEvent) => {
       if (e.event === "session_started") {
         track("session_started", bundle?.roomId);
-        goCapture(e.sessionId, e.targetTimes);
+        goCapture(e.sessionId);
       } else if (e.event === "room_ended") {
         setError("Host mengakhiri room ini.");
       }
@@ -146,9 +146,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     try {
       const r = await roomApi.start(code);
       track("session_started", bundle.roomId);
-      // Host broadcast jadwal dari jam server; klien lain countdown lokal (§11).
-      await send({ event: "session_started", sessionId: r.sessionDbId, totalShots: 4, targetTimes: r.targetTimes });
-      goCapture(r.sessionDbId, r.targetTimes);
+      // Sinyal masuk capture saja; tiap foto dipicu manual per tombol host.
+      await send({ event: "session_started", sessionId: r.sessionDbId, totalShots: 4 });
+      goCapture(r.sessionDbId);
     } catch (e) {
       setError(e instanceof RoomApiError ? e.message : "Tidak bisa memulai sesi.");
       setStarting(false);

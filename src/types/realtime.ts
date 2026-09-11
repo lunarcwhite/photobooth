@@ -5,7 +5,15 @@ export interface SessionStartedEvent {
   event: "session_started";
   sessionId: string;
   totalShots: 4;
-  targetTimes: [number, number, number, number];
+}
+
+// Manual capture: host menekan tombol per foto, broadcast satu target time.
+// Kedua HP countdown lokal 5 detik menuju targetAt yang sama, lalu jepret.
+export interface ShotArmedEvent {
+  event: "shot_armed";
+  sessionId: string;
+  sequence: 1 | 2 | 3 | 4;
+  targetAt: number;
 }
 
 export interface CaptureAckEvent {
@@ -28,6 +36,7 @@ export interface RoomEndedEvent {
 
 export type RoomBroadcastEvent =
   | SessionStartedEvent
+  | ShotArmedEvent
   | CaptureAckEvent
   | SessionFinishedEvent
   | RoomEndedEvent;

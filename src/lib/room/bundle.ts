@@ -11,7 +11,6 @@ export interface RoomBundle {
 
 export interface CaptureBundle {
   sessionDbId: string;
-  targetTimes: [number, number, number, number];
 }
 
 export interface ShotsBundle {

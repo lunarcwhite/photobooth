@@ -9,16 +9,21 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { uploadShot, blobToDataURL } from "@/lib/storage/exchange";
 import { track } from "@/lib/analytics/events";
 import type { RoomBroadcastEvent } from "@/types/realtime";
-import { GhostBtn, ErrorMsg } from "@/components/ui";
+import { Btn, GhostBtn, ErrorMsg } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
-import { getServerOffset } from "@/lib/realtime/clock";
+import { getServerOffset, correctedNow } from "@/lib/realtime/clock";
 import { supabase } from "@/lib/supabase/client";
 import { roomApi } from "@/lib/room/api";
 
-interface State {
-  done: boolean[];
-  acked: boolean[];
-  uploading: boolean[];
+// Capture manual: host menekan tombol per foto → broadcast shot_armed
+// dengan targetAt = correctedNow + 5000ms → kedua HP countdown 5→1 →
+// jepret bareng. Guest hanya menunggu. Upload/ACK/result sama seperti dulu.
+const COUNTDOWN_MS = 5000;
+
+interface ShotState {
+  armedAt: number | null; // targetAt dari shot_armed
+  done: boolean;
+  uploading: boolean;
 }
 
 export default function CapturePage({ params }: { params: Promise<{ code: string }> }) {
@@ -35,19 +40,21 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const [offset, setOffset] = useState(0);
   // Init 0 agar render server = client; jam nyata diisi effect setelah mount.
   const [now, setNow] = useState(0);
-  const [fired, setFired] = useState<boolean[]>([false, false, false, false]);
-  const [st, setSt] = useState<State>({
-    done: [false, false, false, false],
-    acked: [false, false, false, false],
-    uploading: [false, false, false, false],
-  });
+  const [shots, setShots] = useState<ShotState[]>([
+    { armedAt: null, done: false, uploading: false },
+    { armedAt: null, done: false, uploading: false },
+    { armedAt: null, done: false, uploading: false },
+    { armedAt: null, done: false, uploading: false },
+  ]);
   const [myShots, setMyShots] = useState<(string | null)[]>([null, null, null, null]);
   const [partnerPaths, setPartnerPaths] = useState<(string | null)[]>([null, null, null, null]);
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [arming, setArming] = useState(false);
   const [partnerName, setPartnerName] = useState("Pasangan");
   const bgQueue = useRef<{ seq: number; blob: Blob; tries: number }[]>([]);
+  const firedRef = useRef<boolean[]>([false, false, false, false]);
 
   const me = useMemo(
     () =>
@@ -57,11 +64,10 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     [bundle, cameraReady],
   );
 
-  const targetTimes = capture?.targetTimes ?? null;
+  const sessionDbId = capture?.sessionDbId ?? null;
+  const isHost = bundle?.role === "host";
 
-  // Plain function (not memoized): reads latest state when partner's
-  // session_finished arrives or user taps "Lihat Hasil". Defined before
-  // onEvent so the broadcast handler always sees a fresh closure.
+  // Plain function: baca state terbaru saat session_finished tiba / user selesai.
   function finishLocal() {
     if (!bundle || !capture) return;
     const date = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -82,7 +88,14 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   }
 
   function onEvent(e: RoomBroadcastEvent) {
-    if (e.event === "capture_ack" && e.sequence >= 1 && e.sequence <= 4 && e.participantId !== bundle?.participantId) {
+    if (e.event === "shot_armed" && e.sequence >= 1 && e.sequence <= 4) {
+      setShots((prev) => {
+        if (prev[e.sequence - 1].done) return prev;
+        const next = [...prev];
+        next[e.sequence - 1] = { ...next[e.sequence - 1], armedAt: e.targetAt };
+        return next;
+      });
+    } else if (e.event === "capture_ack" && e.sequence >= 1 && e.sequence <= 4 && e.participantId !== bundle?.participantId) {
       setPartnerId(e.participantId);
       setPartnerPaths((prev) => {
         const next = [...prev];
@@ -136,11 +149,10 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   // Tick 100ms untuk countdown presisi (timer eksternal → state).
   /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi timer eksternal, sah */
   useEffect(() => {
-    if (!targetTimes) return;
-    setNow(Date.now() + offset);
-    const id = setInterval(() => setNow(Date.now() + offset), 100);
+    setNow(correctedNow(offset));
+    const id = setInterval(() => setNow(correctedNow(offset)), 100);
     return () => clearInterval(id);
-  }, [targetTimes, offset]);
+  }, [offset]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const [tabHidden, setTabHidden] = useState(false);
@@ -152,22 +164,22 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
   const doUpload = useCallback(
     async (seq: number, blob: Blob, tries = 0) => {
-      if (!bundle || !capture) return;
-      setSt((s) => {
-        const uploading = [...s.uploading];
-        uploading[seq - 1] = true;
-        return { ...s, uploading };
+      if (!bundle || !sessionDbId) return;
+      setShots((s) => {
+        const n = [...s];
+        n[seq - 1] = { ...n[seq - 1], uploading: true };
+        return n;
       });
       try {
-        const path = await uploadShot(capture.sessionDbId, seq, blob);
-        setSt((s) => {
-          const uploading = [...s.uploading];
-          uploading[seq - 1] = false;
-          return { ...s, uploading };
+        const path = await uploadShot(sessionDbId, seq, blob);
+        setShots((s) => {
+          const n = [...s];
+          n[seq - 1] = { ...n[seq - 1], uploading: false };
+          return n;
         });
         await send({
           event: "capture_ack",
-          sessionId: capture.sessionDbId,
+          sessionId: sessionDbId,
           sequence: seq as 1 | 2 | 3 | 4,
           participantId: bundle.participantId,
           capturedAt: Date.now(),
@@ -179,14 +191,14 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
           // Retry 1x; setelah itu slot pasangan jadi placeholder (§14).
           bgQueue.current.push({ seq, blob, tries: tries + 1 });
         }
-        setSt((s) => {
-          const uploading = [...s.uploading];
-          uploading[seq - 1] = false;
-          return { ...s, uploading };
+        setShots((s) => {
+          const n = [...s];
+          n[seq - 1] = { ...n[seq - 1], uploading: false };
+          return n;
         });
       }
     },
-    [bundle, capture, send],
+    [bundle, sessionDbId, send],
   );
 
   // Proses antrean background tanpa memblokir jadwal.
@@ -200,13 +212,9 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
   const fireShot = useCallback(
     async (index: number) => {
-      if (!bundle || !capture) return;
-      setFired((f) => {
-        if (f[index]) return f;
-        const n = [...f];
-        n[index] = true;
-        return n;
-      });
+      if (!bundle || !sessionDbId) return;
+      if (firedRef.current[index]) return;
+      firedRef.current[index] = true;
       try {
         const blob = await cam.captureShot();
         const url = await blobToDataURL(blob);
@@ -215,46 +223,74 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
           n[index] = url;
           return n;
         });
-        setSt((s) => {
-          const done = [...s.done];
-          done[index] = true;
-          return { ...s, done };
+        setShots((s) => {
+          const n = [...s];
+          n[index] = { ...n[index], done: true };
+          return n;
         });
         // Upload jalan di background; jadwal tidak menunggu (§10).
         void doUpload(index + 1, blob);
       } catch {
-        setSt((s) => {
-          const done = [...s.done];
-          done[index] = true;
-          return { ...s, done };
+        firedRef.current[index] = false;
+        setShots((s) => {
+          const n = [...s];
+          n[index] = { ...n[index], armedAt: null };
+          return n;
         });
-        setError(`Foto ${index + 1} gagal diambil, lanjut ke berikutnya.`);
+        setError(`Foto ${index + 1} gagal diambil, coba tekan lagi.`);
       }
     },
-    [bundle, capture, cam, doUpload],
+    [bundle, sessionDbId, cam, doUpload],
   );
 
-  // Cek tiap tick: tembak shot yang targetTimes-nya lewat dan belum fired.
+  // Cek tiap tick: tembak shot yang targetAt-nya lewat dan belum fired.
   useEffect(() => {
-    if (!targetTimes || !cameraReady) return;
-    targetTimes.forEach((t, i) => {
-      if (now >= t && !fired[i]) void fireShot(i);
+    if (!cameraReady) return;
+    shots.forEach((s, i) => {
+      if (s.armedAt !== null && !s.done && now >= s.armedAt) void fireShot(i);
     });
-  }, [now, targetTimes, fired, cameraReady, fireShot]);
+  }, [now, shots, cameraReady, fireShot]);
 
-  const allDone = st.done.every(Boolean);
-  const nextIndex = targetTimes ? targetTimes.findIndex((t) => t > now) : -1;
-  const remainingMs = nextIndex >= 0 && targetTimes ? Math.max(0, targetTimes[nextIndex] - now) : 0;
-  // Jeda antar-shot 7 dtk; 3 dtk terakhir tampil sebagai hitung mundur.
-  const countdown = nextIndex >= 0 ? Math.ceil(remainingMs / 1000) : 0;
-  const showNumber = nextIndex >= 0 && remainingMs <= 3500;
+  // Host memicu satu foto: target 5 detik dari jam terkoreksi.
+  const armShot = async (index: number) => {
+    if (!isHost || !sessionDbId || arming) return;
+    if (shots[index].done || shots[index].armedAt !== null) return;
+    setArming(true);
+    setError(null);
+    try {
+      const targetAt = correctedNow(offset) + COUNTDOWN_MS;
+      await send({
+        event: "shot_armed",
+        sessionId: sessionDbId,
+        sequence: (index + 1) as 1 | 2 | 3 | 4,
+        targetAt,
+      });
+      setShots((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], armedAt: targetAt };
+        return next;
+      });
+    } catch {
+      setError("Gagal memicu foto. Coba lagi.");
+    } finally {
+      setArming(false);
+    }
+  };
+
+  const doneCount = shots.filter((s) => s.done).length;
+  const allDone = doneCount === 4;
+  const armedIndex = shots.findIndex((s) => s.armedAt !== null && !s.done);
+  const armedRemaining = armedIndex >= 0 && shots[armedIndex].armedAt !== null
+    ? Math.max(0, (shots[armedIndex].armedAt as number) - now)
+    : 0;
+  const countdown = armedIndex >= 0 ? Math.ceil(armedRemaining / 1000) : 0;
 
   const finish = async () => {
-    if (finishing || !capture || !bundle) return;
+    if (finishing || !sessionDbId || !bundle) return;
     setFinishing(true);
     try {
-      await roomApi.finish(capture.sessionDbId);
-      await send({ event: "session_finished", sessionId: capture.sessionDbId });
+      await roomApi.finish(sessionDbId);
+      await send({ event: "session_finished", sessionId: sessionDbId });
       track("session_completed", bundle.roomId);
     } catch {
       /* best-effort — halaman result tetap bisa dibuka */
@@ -302,20 +338,12 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       <div className="rounded-3xl border border-zinc-200 p-5 text-center dark:border-zinc-800">
         {!cameraReady ? (
           <p className="text-sm text-zinc-500">Menyiapkan kamera...</p>
-        ) : nextIndex >= 0 ? (
+        ) : armedIndex >= 0 ? (
           <>
-            <p className="text-xs text-zinc-500">
-              Foto {nextIndex + 1} dari 4 {st.uploading.some(Boolean) ? "· mengunggah..." : ""}
+            <p className="text-xs text-zinc-500">Foto {armedIndex + 1} dari 4</p>
+            <p className="mt-1 text-6xl font-bold tabular-nums" aria-live="polite">
+              {countdown}
             </p>
-            {showNumber ? (
-              <p className="mt-1 text-6xl font-bold tabular-nums" aria-live="polite">
-                {countdown}
-              </p>
-            ) : (
-              <p className="mt-1 text-2xl font-semibold" aria-live="polite">
-                Bersiap...
-              </p>
-            )}
             <p className="mt-1 text-sm text-zinc-500">Bersiap... foto diambil otomatis</p>
           </>
         ) : allDone ? (
@@ -326,15 +354,45 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
             </p>
           </>
         ) : (
-          <p className="text-sm text-zinc-500">Menyelesaikan...</p>
+          <>
+            <p className="text-xs text-zinc-500">
+              {doneCount} dari 4 foto selesai {shots.some((s) => s.uploading) ? "· mengunggah..." : ""}
+            </p>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {isHost ? "Tekan tombol foto berikutnya saat kalian siap berpose." : "Menunggu host menekan tombol foto..."}
+            </p>
+          </>
         )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((i) => {
+          const s = shots[i];
+          const label = s.done ? `Foto ${i + 1} ✓` : `Ambil Foto ${i + 1}`;
+          return isHost ? (
+            <Btn
+              key={i}
+              onClick={() => armShot(i)}
+              disabled={!cameraReady || s.done || s.armedAt !== null || armedIndex >= 0 || arming}
+            >
+              {s.armedAt !== null && !s.done ? `${Math.ceil(Math.max(0, ((s.armedAt as number) - now)) / 1000)}...` : arming ? "..." : label}
+            </Btn>
+          ) : (
+            <div
+              key={i}
+              className={`rounded-2xl px-5 py-3.5 text-center text-base font-semibold ${s.done ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-900"}`}
+            >
+              {s.done ? `Foto ${i + 1} ✓` : `Foto ${i + 1}`}
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-4 gap-2">
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`aspect-square overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 ${st.done[i] ? "ring-2 ring-green-500" : ""}`}
+            className={`aspect-square overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 ${shots[i].done ? "ring-2 ring-green-500" : ""}`}
           >
             {myShots[i] ? (
               // eslint-disable-next-line @next/next/no-img-element -- data: URL jepretan lokal; next/image tidak bisa optimasi

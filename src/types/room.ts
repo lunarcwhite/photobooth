@@ -20,5 +20,4 @@ export interface CaptureSession {
   roomId: string;
   status: "pending" | "countdown" | "completed";
   totalShots: number;
-  targetTimes: number[] | null;
 }

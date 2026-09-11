@@ -29,6 +29,10 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   const [starting, setStarting] = useState(false);
   const [joinName, setJoinName] = useState("");
   const [joining, setJoining] = useState(false);
+  // Sesi aktif di server tapi user sengaja di ruang tunggu (tekan Kembali
+  // dari capture). Tampilkan tombol rejoin manual, jangan auto-push agar
+  // tidak bounce bolak-balik waiting ↔ capture.
+  const [pendingSession, setPendingSession] = useState<{ sessionDbId: string } | null>(null);
 
   const cam = useCamera();
   const cameraReady = cam.status === "ready";
@@ -93,7 +97,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   }, [code]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Verifikasi keanggotaan + pulihkan sesi aktif (refresh mid-session).
+  // Verifikasi keanggotaan. Sesi aktif di server tidak langsung push —
+  // tampilkan tombol gabung ulang manual agar tidak bounce (user bisa
+  // sengaja tekan Kembali dari capture).
   useEffect(() => {
     if (!bundle) return;
     let cancelled = false;
@@ -108,13 +114,14 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
           setError(r.status === "expired" ? "Room sudah kedaluwarsa." : "Room sudah selesai.");
           return;
         }
-        // Refresh di tengah sesi → langsung kembali ke capture.
         if (r.activeSession) {
           const existing = loadCaptureBundle(code);
           if (!existing || existing.sessionDbId !== r.activeSession.sessionDbId) {
             saveCaptureBundle(code, r.activeSession);
           }
-          router.push(`/room/${code}/capture`);
+          setPendingSession({ sessionDbId: r.activeSession.sessionDbId });
+        } else {
+          setPendingSession(null);
         }
       } catch (e) {
         if (cancelled) return;
@@ -222,7 +229,16 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Masukkan namamu untuk gabung ke room ini.
         </p>
-        <ErrorMsg msg={error} />
+      <ErrorMsg msg={error} />
+
+      {pendingSession && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-center dark:border-amber-800 dark:bg-amber-950">
+          <p className="text-sm font-medium">Sesi foto masih berjalan.</p>
+          <div className="mt-3">
+            <Btn onClick={() => goCapture(pendingSession.sessionDbId)}>Kembali ke Sesi Foto</Btn>
+          </div>
+        </div>
+      )}
         <Card>
           <div className="flex flex-col gap-3">
             <Field value={joinName} onChange={(e) => setJoinName(e.target.value)} placeholder="Namamu" maxLength={30} autoComplete="nickname" />

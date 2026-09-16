@@ -645,24 +645,34 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
             />
           </div>
 
-          {/* Focused Centered Countdown Badge */}
+          {/* Non-Intrusive Countdown Overlay (Does not block faces / viewfinder preview) */}
           {cameraReady && (countdown > 0 || (captureMode === "manual" && armedShot && countdown === 0)) && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
-              <div className="flex flex-col items-center justify-center rounded-3xl bg-black/75 px-10 py-7 text-center text-white backdrop-blur-md border border-white/20 shadow-2xl">
-                <span className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">
-                  Bersiap · Foto {armedShot ? armedShot.sequence : activeIndex + 1} dari 4
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-2.5 sm:p-4 z-20">
+              {/* Sleek Top Floating Pill (Above eye/head level) */}
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-black/60 px-3 py-1 sm:px-4 sm:py-1.5 text-white backdrop-blur-md border border-white/20 shadow-md">
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white/90">
+                  Foto {armedShot ? armedShot.sequence : activeIndex + 1} dari 4
                 </span>
+                <span className="text-white/30">•</span>
+                <span className="text-[10px] sm:text-xs font-medium text-amber-300">
+                  {countdown > 0 ? "Pasang pose!" : "Jepret!"}
+                </span>
+              </div>
+
+              {/* Compact Center Countdown Badge (Fits between dual camera columns, leaves faces visible) */}
+              <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm border border-white/25 shadow-xl">
                 <span
                   key={`${activeIndex}-${countdown}`}
-                  className="countdown-num font-display text-7xl md:text-9xl font-bold text-white tabular-nums my-1"
+                  className="countdown-num font-display text-2xl sm:text-4xl font-extrabold tabular-nums text-white"
                   aria-live="polite"
                 >
                   {countdown > 0 ? countdown : "✦"}
                 </span>
-                <span className="text-[11px] font-medium text-white/60">
-                  {countdown > 0 ? "Pasang pose terbaikmu!" : "Jepret!"}
-                </span>
               </div>
+
+              {/* Bottom Spacer for balance */}
+              <div className="h-5 sm:h-6" aria-hidden />
             </div>
           )}
 

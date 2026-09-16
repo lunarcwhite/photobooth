@@ -9,6 +9,7 @@ import { track } from "@/lib/analytics/events";
 import { Btn, GhostBtn, ErrorMsg, StepBadge, Segmented } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
 import { CameraIcon, CheckIcon, ClockIcon, RefreshIcon } from "@/components/icons";
+import { POSE_GUIDES } from "@/types/template";
 
 // Mode satu HP (PRD §5): satu kamera, berdua dalam satu bingkai,
 // 4 jepretan strip. Mendukung mode Otomatis dan Manual (tombol shutter)
@@ -228,14 +229,15 @@ export default function SamaPage() {
   };
 
   const doneCount = shots.filter(Boolean).length;
+  const currentPose = POSE_GUIDES[Math.min(3, Math.max(0, shotIndex))];
 
   return (
-    <main className="flex h-dvh w-full flex-col gap-2 sm:gap-3 overflow-hidden px-3 py-2 sm:px-6 sm:py-3 md:px-8 lg:gap-4 lg:px-12 xl:mx-auto xl:max-w-[1500px] xl:px-14">
-      {/* Top Bar Navigation */}
-      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-booth-line/60 pb-2 sm:pb-3 dark:border-booth-nightline/60">
-        <div className="flex min-w-0 items-center gap-2">
+    <main className="flex h-dvh w-full flex-col gap-2.5 overflow-hidden px-3 py-2 sm:px-6 sm:py-3 md:px-8 lg:gap-4 lg:px-12 xl:mx-auto xl:max-w-[1400px] xl:px-14">
+      {/* Top Bar Header */}
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-booth-line/60 pb-2.5 dark:border-booth-nightline/60">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] leading-normal font-bold uppercase tracking-[0.14em] text-booth-muted dark:text-booth-creamdim">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-booth-muted dark:text-booth-creamdim">
               <span className="text-booth-accent font-bold">1/2</span>
               <span className="opacity-40">·</span>
               <span className="truncate">Satu HP Berdua</span>
@@ -244,7 +246,7 @@ export default function SamaPage() {
               {phase === "done"
                 ? "Dapat! Semua 4 foto jadi ✦"
                 : phase === "running"
-                  ? `Foto ${shotIndex + 1} dari 4`
+                  ? `Foto ${shotIndex + 1}: ${currentPose.emoji} ${currentPose.title}`
                   : "Berdua dalam satu kamera"}
             </h1>
           </div>
@@ -314,10 +316,10 @@ export default function SamaPage() {
           {cameraReady && phase === "running" && isCountingDown && (
             <div className="pointer-events-auto absolute inset-0 flex flex-col items-center justify-between p-2.5 sm:p-4 z-20">
               {/* Sleek Top Floating Pill (Above eye/head level) */}
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-black/60 px-3 py-1 sm:px-4 sm:py-1.5 text-white backdrop-blur-md border border-white/20 shadow-md">
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-black/65 px-3 py-1 sm:px-4 sm:py-1.5 text-white backdrop-blur-md border border-white/20 shadow-md">
                 <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
                 <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white/90">
-                  Foto {shotIndex + 1} dari 4
+                  Foto {shotIndex + 1}: {currentPose?.emoji} {currentPose?.title}
                 </span>
                 <span className="text-white/30">•</span>
                 <span className="text-[10px] sm:text-xs font-medium text-amber-300">
@@ -499,6 +501,26 @@ export default function SamaPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Phase: RUNNING (Couple Pose Guide Card) */}
+          {phase === "running" && currentPose && (
+            <div className="booth-card rounded-2xl p-2.5 sm:p-3 border-amber-500/30 bg-amber-500/[0.04] dark:bg-amber-500/[0.06]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-base shrink-0">{currentPose.emoji}</span>
+                  <span className="text-xs font-bold text-booth-ink dark:text-booth-cream truncate">
+                    Pose #{currentPose.id}: {currentPose.title}
+                  </span>
+                </div>
+                <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                  Ide Pose Berdua
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-booth-ink/80 dark:text-booth-cream/80 leading-snug">
+                {currentPose.desc}
+              </p>
             </div>
           )}
 

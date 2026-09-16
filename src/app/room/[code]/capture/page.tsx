@@ -17,6 +17,7 @@ import { getServerOffset, correctedNow } from "@/lib/realtime/clock";
 import { supabase } from "@/lib/supabase/client";
 import { roomApi } from "@/lib/room/api";
 import { AlertIcon, BackIcon, CameraIcon, CheckIcon, ClockIcon, MicIcon, MicOffIcon } from "@/components/icons";
+import { POSE_GUIDES } from "@/types/template";
 
 // Capture otomatis: jadwal 4 targetTimes jam server dari room-api.start.
 // Host: after session_started kirim mismo ke guest. Guest: bundle lama
@@ -554,18 +555,25 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     );
   }
 
+  const activePoseIndex = armedShot
+    ? armedShot.sequence - 1
+    : activeIndex >= 0
+      ? activeIndex
+      : nextUnfinishedIndex;
+  const currentPose = POSE_GUIDES[Math.min(3, Math.max(0, activePoseIndex))];
+
   const statusLine = !cameraReady
     ? "Menyiapkan kamera…"
     : allDone
       ? "Dapat! Semua 4 foto jadi."
       : captureMode === "manual"
         ? armedShot
-          ? `Bersiap — foto ${armedShot.sequence} dari 4…`
+          ? `Bersiap — foto ${armedShot.sequence} (${currentPose?.emoji} ${currentPose?.title})…`
           : isHost
-            ? `Foto ${nextUnfinishedIndex + 1} dari 4 — tekan tombol jepret.`
-            : `Menunggu host menjepret foto ${nextUnfinishedIndex + 1} dari 4…`
+            ? `Foto ${nextUnfinishedIndex + 1}: ${currentPose?.emoji} ${currentPose?.title} — tekan jepret.`
+            : `Menunggu host foto ${nextUnfinishedIndex + 1}: ${currentPose?.emoji} ${currentPose?.title}…`
         : activeIndex >= 0
-          ? `Bersiap — foto ${activeIndex + 1} dari 4…`
+          ? `Bersiap foto ${activeIndex + 1}: ${currentPose?.emoji} ${currentPose?.title}…`
           : "Menyiapkan…";
   const uploading = shots.some((s) => s.uploading);
 
@@ -576,7 +584,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         <div className="flex items-center gap-3">
           <div className="min-w-0">
             <StepBadge step="3" of="4" label="Sesi Foto" />
-            <h1 className="font-display mt-0.5 text-lg sm:text-xl font-bold tracking-tight text-booth-ink dark:text-booth-cream">
+            <h1 className="font-display mt-0.5 text-lg sm:text-xl font-bold tracking-tight text-booth-ink dark:text-booth-cream truncate">
               {statusLine}
             </h1>
           </div>
@@ -649,10 +657,10 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
           {cameraReady && (countdown > 0 || (captureMode === "manual" && armedShot && countdown === 0)) && (
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-2.5 sm:p-4 z-20">
               {/* Sleek Top Floating Pill (Above eye/head level) */}
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-black/60 px-3 py-1 sm:px-4 sm:py-1.5 text-white backdrop-blur-md border border-white/20 shadow-md">
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-black/65 px-3 py-1 sm:px-4 sm:py-1.5 text-white backdrop-blur-md border border-white/20 shadow-md">
                 <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
                 <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white/90">
-                  Foto {armedShot ? armedShot.sequence : activeIndex + 1} dari 4
+                  Foto {armedShot ? armedShot.sequence : activeIndex + 1}: {currentPose?.emoji} {currentPose?.title}
                 </span>
                 <span className="text-white/30">•</span>
                 <span className="text-[10px] sm:text-xs font-medium text-amber-300">
@@ -671,8 +679,12 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 </span>
               </div>
 
-              {/* Bottom Spacer for balance */}
-              <div className="h-5 sm:h-6" aria-hidden />
+              {/* Bottom Cue Badge: Specific pose instruction for Host vs Guest */}
+              <div className="rounded-full bg-black/65 px-3.5 py-1 text-white backdrop-blur-md border border-white/20 shadow-md max-w-[92%] text-center">
+                <p className="text-[11px] sm:text-xs font-medium text-white/95 truncate">
+                  <span className="text-amber-300 font-bold">Tips kamu:</span> {isHost ? currentPose?.hostTip : currentPose?.guestTip}
+                </p>
+              </div>
             </div>
           )}
 
@@ -683,6 +695,31 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
         {/* Sidebar Filmstrip Console */}
         <div className="flex shrink-0 flex-col gap-2.5 sm:gap-3 landscape:min-h-0 landscape:w-56 landscape:justify-center landscape:overflow-y-auto md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-76 lg:overflow-visible">
+          {/* Couple Pose Guide Card */}
+          {!allDone && currentPose && (
+            <div className="booth-card rounded-2xl p-2.5 sm:p-3 border-amber-500/30 bg-amber-500/[0.04] dark:bg-amber-500/[0.06]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-base shrink-0">{currentPose.emoji}</span>
+                  <span className="text-xs font-bold text-booth-ink dark:text-booth-cream truncate">
+                    Pose #{currentPose.id}: {currentPose.title}
+                  </span>
+                </div>
+                <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                  Ide Pose Berdua
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-booth-ink/80 dark:text-booth-cream/80 leading-snug">
+                {currentPose.desc}
+              </p>
+              <div className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                <span>Tips kamu:</span>
+                <span className="font-medium text-booth-ink dark:text-booth-cream">
+                  {isHost ? currentPose.hostTip : currentPose.guestTip}
+                </span>
+              </div>
+            </div>
+          )}
           {/* Filmstrip Card */}
           <div className="booth-card rounded-2xl p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">

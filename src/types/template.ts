@@ -26,6 +26,78 @@ export const SOLO_LAYOUTS: { value: SoloLayout; label: string; desc: string }[] 
   { value: "grid2x2", label: "🖼️ Grid 2x2", desc: "4 foto dalam bingkai kotak polaroid" },
 ];
 
+export type RemoteLayout = "seamless" | "split" | "twin";
+
+export const REMOTE_LAYOUTS: { value: RemoteLayout; label: string; desc: string }[] = [
+  { value: "seamless", label: "✨ Bilik Bersatu", desc: "4 frame lebar menyatu seolah satu bilik berdua" },
+  { value: "split", label: "🪟 Grid Klasik", desc: "8 foto dalam kotak berdampingan" },
+  { value: "twin", label: "✂️ Strip Kembar", desc: "2 strip masing-masing 4 foto dengan garis potong" },
+];
+
+export interface PoseGuide {
+  id: number;
+  shot: number;
+  title: string;
+  desc: string;
+  instruction: string;
+  emoji: string;
+  icon: string;
+  tag: string;
+  hostTip: string;
+  guestTip: string;
+}
+
+export const POSE_GUIDES: PoseGuide[] = [
+  {
+    id: 1,
+    shot: 1,
+    title: "Setengah Hati",
+    desc: "Bentuk lambang hati bersama!",
+    instruction: "Kiri bikin tangan hati ke kanan, kanan ke kiri → menyatu di hasil!",
+    emoji: "🫶",
+    icon: "🫶",
+    tag: "Tangan Hati",
+    hostTip: "Bikin tangan kanan melengkung ke kanan",
+    guestTip: "Bikin tangan kiri melengkung ke kiri",
+  },
+  {
+    id: 2,
+    shot: 2,
+    title: "Saling Menunjuk",
+    desc: "Tunjuk layar ke arah pasanganmu!",
+    instruction: "Saling menunjuk dan tersenyum ke arah pasanganmu!",
+    emoji: "👉👈",
+    icon: "👉👈",
+    tag: "Menunjuk",
+    hostTip: "Tunjuk ke sisi kanan (ke arah teman)",
+    guestTip: "Tunjuk ke sisi kiri (ke arah host)",
+  },
+  {
+    id: 3,
+    shot: 3,
+    title: "Merapat & Bersandar",
+    desc: "Condongkan kepala seolah bersandar di bahu",
+    instruction: "Miringkan kepala saling merapat ke garis tengah bilik!",
+    emoji: "🥰",
+    icon: "🥰",
+    tag: "Bersandar",
+    hostTip: "Condongkan kepala ke kanan",
+    guestTip: "Condongkan kepala ke kiri",
+  },
+  {
+    id: 4,
+    shot: 4,
+    title: "Gaya Bebas & Peace",
+    desc: "Senyum lepas atau pose favorit kalian!",
+    instruction: "Pasang senyum terbaik atau ekspresi konyol favorit kalian!",
+    emoji: "✌️",
+    icon: "✌️",
+    tag: "Gaya Bebas",
+    hostTip: "Pose terbaikmu!",
+    guestTip: "Pose terbaikmu!",
+  },
+];
+
 // 4 varian DESIGN §18: Classic, Retro, Minimal, Polaroid. Semua 8 slot,
 // beda di background/tipografi/grain — tanpa ubah pipeline compose.
 export const TEMPLATES: [TemplateConfig, TemplateConfig, TemplateConfig, TemplateConfig] = [

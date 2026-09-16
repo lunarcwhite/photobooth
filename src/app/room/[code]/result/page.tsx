@@ -14,9 +14,11 @@ import {
   PHOTO_STYLES,
   PHOTO_DECORS,
   SOLO_LAYOUTS,
+  REMOTE_LAYOUTS,
   type PhotoDecor,
   type PhotoStyle,
   type SoloLayout,
+  type RemoteLayout,
 } from "@/types/template";
 import { Btn, GhostBtn, ErrorMsg, StepBadge, Segmented, Field } from "@/components/ui";
 import { CheckIcon, ClockIcon, DownloadIcon, RefreshIcon, ShareIcon } from "@/components/icons";
@@ -30,6 +32,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
   const [mounted, setMounted] = useState(false);
   const [tplIndex, setTplIndex] = useState(0);
   const [soloLayout, setSoloLayout] = useState<SoloLayout>("single");
+  const [remoteLayout, setRemoteLayout] = useState<RemoteLayout>("seamless");
   const [partnerShots, setPartnerShots] = useState<(string | null)[]>([null, null, null, null]);
   const [loading, setLoading] = useState<boolean[]>([false, false, false, false]);
   const [finalUrl, setFinalUrl] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     setShots(s);
     if (s) {
       setPartnerShots(s.partnerShots);
-      if (!s.solo) setMobileTab("frame");
+      setMobileTab("layout");
     }
     setBundle(loadRoomBundle(code));
     setMounted(true);
@@ -162,6 +165,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
           caption,
           isSolo: Boolean(shots.solo),
           soloLayout,
+          remoteLayout,
         });
         if (cancelled) return;
         setFinalUrl((prev) => {
@@ -179,7 +183,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     return () => {
       cancelled = true;
     };
-  }, [shots, tpl, slots, style, decor, caption, soloLayout]);
+  }, [shots, tpl, slots, style, decor, caption, soloLayout, remoteLayout]);
 
   // Ambil ulang: broadcast retake → kedua HP kembali ke booth.
   const retake = async () => {
@@ -303,19 +307,17 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
         <div className="flex shrink-0 flex-col gap-2 md:hidden">
           {/* Mobile Tab Switcher */}
           <div className="flex items-center rounded-xl bg-booth-line/30 dark:bg-booth-nightline/50 p-1 gap-1 border border-booth-line/60 dark:border-booth-nightline/60">
-            {shots.solo && (
-              <button
-                type="button"
-                onClick={() => setMobileTab("layout")}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition text-center ${
-                  mobileTab === "layout"
-                    ? "bg-booth-card dark:bg-booth-nightcard text-booth-ink dark:text-booth-cream shadow-xs"
-                    : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
-                }`}
-              >
-                📐 Layout
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setMobileTab("layout")}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition text-center ${
+                mobileTab === "layout"
+                  ? "bg-booth-card dark:bg-booth-nightcard text-booth-ink dark:text-booth-cream shadow-xs"
+                  : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+              }`}
+            >
+              📐 Layout
+            </button>
             <button
               type="button"
               onClick={() => setMobileTab("frame")}
@@ -342,17 +344,33 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
 
           {/* Active Tab Panel */}
           <div className="booth-card rounded-2xl p-2.5 sm:p-3">
-            {mobileTab === "layout" && shots.solo && (
+            {mobileTab === "layout" && (
               <div className="space-y-1.5">
-                <Segmented
-                  label="Pilih tata letak"
-                  value={soloLayout}
-                  onChange={(v) => setSoloLayout(v as SoloLayout)}
-                  options={SOLO_LAYOUTS.map((l) => ({ value: l.value, label: l.label }))}
-                />
-                <p className="text-[10px] text-booth-muted dark:text-booth-creamdim text-center font-medium">
-                  {SOLO_LAYOUTS.find((l) => l.value === soloLayout)?.desc}
-                </p>
+                {shots.solo ? (
+                  <>
+                    <Segmented
+                      label="Pilih tata letak"
+                      value={soloLayout}
+                      onChange={(v) => setSoloLayout(v as SoloLayout)}
+                      options={SOLO_LAYOUTS.map((l) => ({ value: l.value, label: l.label }))}
+                    />
+                    <p className="text-[10px] text-booth-muted dark:text-booth-creamdim text-center font-medium">
+                      {SOLO_LAYOUTS.find((l) => l.value === soloLayout)?.desc}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Segmented
+                      label="Pilih tata letak berdua"
+                      value={remoteLayout}
+                      onChange={(v) => setRemoteLayout(v as RemoteLayout)}
+                      options={REMOTE_LAYOUTS.map((l) => ({ value: l.value, label: l.label }))}
+                    />
+                    <p className="text-[10px] text-booth-muted dark:text-booth-creamdim text-center font-medium">
+                      {REMOTE_LAYOUTS.find((l) => l.value === remoteLayout)?.desc}
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
@@ -440,28 +458,44 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
 
         {/* DESKTOP Customization Console (>= md) */}
         <div className="hidden md:flex shrink-0 flex-col gap-3 overflow-y-auto md:min-h-0 md:justify-start lg:gap-3.5 pr-0.5">
-          {/* Group 0: Layout Selection (Khusus Mode Satu HP Berdua) */}
-          {shots.solo && (
-            <div className="booth-card rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-booth-muted dark:text-booth-creamdim block">
-                  Tata Letak (Layout)
-                </label>
-                <span className="text-[10px] font-bold text-booth-accent">
-                  {SOLO_LAYOUTS.find((l) => l.value === soloLayout)?.label}
-                </span>
-              </div>
-              <Segmented
-                label="Pilih tata letak"
-                value={soloLayout}
-                onChange={(v) => setSoloLayout(v as SoloLayout)}
-                options={SOLO_LAYOUTS.map((l) => ({ value: l.value, label: l.label }))}
-              />
-              <p className="mt-2 text-[11px] text-booth-muted dark:text-booth-creamdim leading-tight">
-                {SOLO_LAYOUTS.find((l) => l.value === soloLayout)?.desc}
-              </p>
+          {/* Group 0: Layout Selection */}
+          <div className="booth-card rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-booth-muted dark:text-booth-creamdim block">
+                Tata Letak (Layout)
+              </label>
+              <span className="text-[10px] font-bold text-booth-accent">
+                {shots.solo
+                  ? SOLO_LAYOUTS.find((l) => l.value === soloLayout)?.label
+                  : REMOTE_LAYOUTS.find((l) => l.value === remoteLayout)?.label}
+              </span>
             </div>
-          )}
+            {shots.solo ? (
+              <>
+                <Segmented
+                  label="Pilih tata letak"
+                  value={soloLayout}
+                  onChange={(v) => setSoloLayout(v as SoloLayout)}
+                  options={SOLO_LAYOUTS.map((l) => ({ value: l.value, label: l.label }))}
+                />
+                <p className="mt-2 text-[11px] text-booth-muted dark:text-booth-creamdim leading-tight">
+                  {SOLO_LAYOUTS.find((l) => l.value === soloLayout)?.desc}
+                </p>
+              </>
+            ) : (
+              <>
+                <Segmented
+                  label="Pilih tata letak"
+                  value={remoteLayout}
+                  onChange={(v) => setRemoteLayout(v as RemoteLayout)}
+                  options={REMOTE_LAYOUTS.map((l) => ({ value: l.value, label: l.label }))}
+                />
+                <p className="mt-2 text-[11px] text-booth-muted dark:text-booth-creamdim leading-tight">
+                  {REMOTE_LAYOUTS.find((l) => l.value === remoteLayout)?.desc}
+                </p>
+              </>
+            )}
+          </div>
 
           {/* Group 1: Template Selection */}
           <div className="booth-card rounded-2xl p-4">

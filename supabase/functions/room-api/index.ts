@@ -325,6 +325,8 @@ serve(async (req) => {
       .from("capture_sessions")
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", sessionDbId);
+    // Booth kembali waiting agar bisa ambil ulang tanpa buat room baru.
+    await db.from("rooms").update({ status: "waiting" }).eq("id", cs.room_id);
     return json({ ok: true });
   }
 

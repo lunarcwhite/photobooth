@@ -17,7 +17,7 @@ export async function uploadShot(sessionDbId: string, sequence: number, blob: Bl
 export async function downloadShot(sessionDbId: string, sequence: number, participantId: string): Promise<Blob> {
   const s = await roomApi.signedUrl({ sessionDbId, sequence, op: "download", participantId });
   const res = await fetch(s.signedUrl);
-  if (!res.ok) throw new Error("Unduhan foto pasangan gagal");
+  if (!res.ok) throw new Error("Unduhan foto teman gagal");
   return await res.blob();
 }
 

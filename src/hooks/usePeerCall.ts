@@ -24,16 +24,29 @@ const dbg = (...a: unknown[]) => {
   }
 };
 
+// Batas agar "menghubungkan..." tidak selamanya: resend/offer basi lalu segar.
+const RESEND_MS = 4000;
+const MAX_RESEND_SAME = 5; // 20 dtk tanpa jawaban → offer baru
+const WATCHDOG_MS = 5000;
+const CALLING_TIMEOUT_MS = 15000;
+const MAX_AUTO_ATTEMPTS = 2; // lalu "failed" agar tombol Coba Lagi muncul
+
 // P2P video+suara via RTCPeerConnection. Signaling lewat Broadcast Supabase.
-// Aturan Luther: SATU PC per upaya. Host membuat offer sekali, lalu kirim
-// ulang SDP YANG SAMA tiap 4 detik sampai connected — tidak pernah bikin
-// ulang PC saat loop (itu yang membuat jawaban guest basi).
-// Guest menjawab sekali, abaikan offer duplikat selama calling/connected.
+// Anti-deadlock: jawaban yang hilang di jalan DIPERBAIKI, bukan diabaikan.
+// - Guest menyimpan jawaban terakhir; offer duplikat (SDP SAMA) dibalas
+//   dengan jawaban tersimpan — host yang tidak pernah menerima jawaban
+//   bisa lanjut, bukan stuck "menghubungkan..." selamanya.
+// - Offer BARU (SDP beda, host bikin PC baru mis. pindah halaman) selalu
+//   dijawab ulang.
+// - Host menghitung resend tanpa jawaban: > MAX_RESEND_SAME → handshake
+//   segar (PC + offer baru) agar guest yang menunggu offer basi bisa jawab.
+// - Buffer ICE dipertahankan saat ganti PC (kandidat dini tidak dibuang).
+// - Watchdog: calling terlalu lama → restart otomatis (maks 2x) → failed.
 export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Args) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const [status, setStatus] = useState<CallStatus>("idle");
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [pendingOffer, setPendingOffer] = useState<{ from: string; sdp: string } | null>(null);
+  const [pendingOffer, setPendingOffer] = useState<{ from: string; sdp: string; offerId: string } | null>(null);
 
   const myIdRef = useRef(myId);
   const peerIdRef = useRef(peerId);
@@ -43,7 +56,18 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
   const enabledRef = useRef(enabled);
   const statusRef = useRef(status);
   const pendingIceRef = useRef<RTCIceCandidateInit[]>([]);
-  const answeredRef = useRef(false);
+  // ID unik per handshake: jawaban basi (offerId lama) ditolak agar tidak
+  // meracuni PC baru. Perbandingan SDP saja tidak cukup karena dua offer
+  // berbeda bisa punya SDP identik.
+  const offerIdRef = useRef<string | null>(null);
+  const answeredOfferIdRef = useRef<string | null>(null);
+  const answeredSdpRef = useRef<string | null>(null);
+  const lastAnswerRef = useRef<{ offerId: string; sdp: string } | null>(null);
+  const resendCountRef = useRef(0);
+  const callingSinceRef = useRef<number | null>(null);
+  const autoAttemptsRef = useRef(0);
+  const startingRef = useRef(false);
+  const lastHelloRef = useRef(0);
 
   useEffect(() => {
     myIdRef.current = myId;
@@ -55,14 +79,24 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
   });
   useEffect(() => {
     statusRef.current = status;
+    if (status === "calling" && callingSinceRef.current === null) {
+      callingSinceRef.current = Date.now();
+    } else if (status !== "calling") {
+      callingSinceRef.current = null;
+    }
   }, [status]);
 
   const closePc = useCallback((keepRemote = false) => {
     dbg("closePc");
     pcRef.current?.close();
     pcRef.current = null;
-    pendingIceRef.current = [];
-    answeredRef.current = false;
+    // ICE buffer DIPERTAHANKAN (kandidat dini berguna untuk PC pengganti;
+    // yang basi gagal diam-diam saat flush).
+    offerIdRef.current = null;
+    answeredOfferIdRef.current = null;
+    answeredSdpRef.current = null;
+    lastAnswerRef.current = null;
+    resendCountRef.current = 0;
     if (!keepRemote) setRemoteStream(null);
   }, []);
 
@@ -83,7 +117,6 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
   const makePc = useCallback(() => {
     dbg("makePc host=", isHostRef.current);
     pcRef.current?.close();
-    pendingIceRef.current = [];
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
@@ -130,8 +163,18 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
     return pc;
   }, []);
 
-  // Host: buat offer SEKALI, kirim ulang SDP sama sampai connected.
+  const sendOffer = useCallback(async (pc: RTCPeerConnection) => {
+    const id = myIdRef.current;
+    if (!id) return;
+    const desc = pc.localDescription;
+    if (!desc) return;
+    dbg("offer sent", offerIdRef.current);
+    await sendRef.current({ event: "call_offer", from: id, sdp: JSON.stringify(desc), offerId: offerIdRef.current ?? undefined });
+  }, []);
+
+  // Host: buat offer. Guard ganda agar hello beruntun tidak bikin PC ganda.
   const startHost = useCallback(async () => {
+    if (startingRef.current) return;
     const id = myIdRef.current;
     const peer = peerIdRef.current;
     const local = streamRef.current;
@@ -139,26 +182,49 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
       dbg("startHost skip", { id: !!id, peer: !!peer, local: !!local });
       return;
     }
+    startingRef.current = true;
     try {
       setStatus("calling");
+      offerIdRef.current = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
       const pc = makePc();
       const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
       await pc.setLocalDescription(offer);
-      dbg("offer sent");
-      await sendRef.current({ event: "call_offer", from: id, sdp: JSON.stringify(offer) });
+      resendCountRef.current = 0;
+      await sendOffer(pc);
     } catch (e) {
       dbg("offer fail", e);
       setStatus("failed");
+    } finally {
+      startingRef.current = false;
     }
-  }, [makePc]);
+  }, [makePc, sendOffer]);
 
+  // Kirim ulang SDP SAMA; bila tak kunjung dijawab → handshake segar.
   const resendOffer = useCallback(() => {
     const pc = pcRef.current;
-    const id = myIdRef.current;
     const desc = pc?.localDescription;
-    if (!pc || !desc || !id) return;
-    dbg("resend same offer");
-    void sendRef.current({ event: "call_offer", from: id, sdp: JSON.stringify(desc) }).catch(() => {});
+    if (!pc || !desc) {
+      void startHost();
+      return;
+    }
+    resendCountRef.current += 1;
+    if (resendCountRef.current > MAX_RESEND_SAME) {
+      dbg("offer basi, handshake segar");
+      void startHost();
+      return;
+    }
+    dbg("resend same offer", resendCountRef.current);
+    void sendOffer(pc).catch(() => {});
+  }, [startHost, sendOffer]);
+
+  const sayHello = useCallback(() => {
+    const id = myIdRef.current;
+    if (!id) return;
+    // Debounce 2 dtk agar restart beruntun tidak storm.
+    const now = Date.now();
+    if (now - lastHelloRef.current < 2000) return;
+    lastHelloRef.current = now;
+    void sendRef.current({ event: "call_hello", from: id }).catch(() => {});
   }, []);
 
   const handleSignal = useCallback(
@@ -168,8 +234,6 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
       dbg("signal", e.event, "from", e.from.slice(0, 8));
       if (e.event === "call_hello") {
         if (isHostRef.current && enabledRef.current && statusRef.current !== "connected") {
-          // Tamu siap tapi belum ada offer terkirim → mulai; kalau sudah
-          // calling → kirim ulang SDP yang sama, jangan bikin PC baru.
           if (pcRef.current?.localDescription) resendOffer();
           else void startHost();
         }
@@ -177,19 +241,42 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
       }
       if (e.event === "call_offer") {
         if (isHostRef.current) return;
-        // Abaikan duplikat selama sudah menjawab / sudah connect.
-        if (statusRef.current === "connected" || answeredRef.current) {
-          dbg("offer ignored (already answered/connected)");
+        const offerId = e.offerId ?? e.sdp;
+        if (statusRef.current === "connected" && offerId === answeredOfferIdRef.current) {
+          dbg("offer duplikat saat connected, abaikan");
           return;
         }
-        setPendingOffer({ from: e.from, sdp: e.sdp });
+        if (offerId === answeredOfferIdRef.current && lastAnswerRef.current) {
+          // Offer duplikat = jawaban kami kemungkinan hilang di jalan.
+          // Kirim ulang jawaban tersimpan (tanpa PC baru).
+          dbg("offer duplikat, kirim ulang jawaban tersimpan");
+          const my = myIdRef.current;
+          if (my) {
+            void sendRef
+              .current({ event: "call_answer", from: my, sdp: lastAnswerRef.current.sdp, offerId: lastAnswerRef.current.offerId })
+              .catch(() => {});
+          }
+          return;
+        }
+        // Offer baru (atau belum pernah dijawab) → jawab segar.
+        setPendingOffer({ from: e.from, sdp: e.sdp, offerId });
         return;
       }
       if (e.event === "call_answer") {
         if (!isHostRef.current) return;
+        const answerOfferId = e.offerId ?? null;
+        if (answerOfferId && offerIdRef.current && answerOfferId !== offerIdRef.current) {
+          // Jawaban untuk handshake lama (PC sudah diganti) → tolak agar
+          // tidak meracuni PC baru.
+          dbg("jawaban basi ditolak", answerOfferId, offerIdRef.current);
+          return;
+        }
         const pc = pcRef.current;
         if (!pc) {
-          dbg("answer ignored (no pc)");
+          // Jawaban datang tapi PC sudah tidak ada (mis. remount) →
+          // handshake segar agar guest menjawab SDP baru.
+          dbg("answer tanpa pc, handshake segar");
+          void startHost();
           return;
         }
         (async () => {
@@ -232,11 +319,12 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
     [closePc, flushIce, resendOffer, startHost],
   );
 
-  // Host mulai saat siap; loop kirim ulang SDP SAMA tiap 4 dtk.
+  // Host mulai saat siap; loop kirim ulang SDP SAMA tiap 4 dtk
+  // (resendOffer menyegarkan sendiri bila basi).
   /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi status koneksi eksternal, sah */
   useEffect(() => {
     if (!enabled || !myId || !stream) return;
-    sendRef.current({ event: "call_hello", from: myId }).catch(() => {});
+    sayHello();
     if (!isHost || !peerId) return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -247,15 +335,15 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
         return;
       }
       resendOffer();
-    }, 4000);
+    }, RESEND_MS);
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [enabled, myId, peerId, stream, isHost, startHost, resendOffer]);
+  }, [enabled, myId, peerId, stream, isHost, startHost, resendOffer, sayHello]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Guest menjawab offer tertunda sekali.
+  // Guest menjawab offer tertunda; jawaban disimpan untuk resend.
   useEffect(() => {
     if (!pendingOffer || !stream || !myId || !enabled || isHost) return;
     let cancelled = false;
@@ -268,9 +356,12 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         if (cancelled) return;
-        await sendRef.current({ event: "call_answer", from: myId, sdp: JSON.stringify(answer) });
-        dbg("answer sent");
-        answeredRef.current = true;
+        const sdp = JSON.stringify(answer);
+        await sendRef.current({ event: "call_answer", from: myId, sdp, offerId: pendingOffer.offerId });
+        dbg("answer sent", pendingOffer.offerId);
+        answeredOfferIdRef.current = pendingOffer.offerId;
+        answeredSdpRef.current = pendingOffer.sdp;
+        lastAnswerRef.current = { offerId: pendingOffer.offerId, sdp };
         setPendingOffer(null);
       } catch (err) {
         dbg("answer fail", err);
@@ -281,6 +372,34 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
       cancelled = true;
     };
   }, [pendingOffer, stream, myId, enabled, isHost, makePc, flushIce]);
+
+  // Watchdog: calling terlalu lama → restart otomatis (maks 2x),
+  // lalu "failed" agar tombol Coba Lagi muncul (tidak spinner selamanya).
+  useEffect(() => {
+    if (!enabled) return;
+    const id = setInterval(() => {
+      if (statusRef.current !== "calling") return;
+      if (!enabledRef.current || !streamRef.current || !myIdRef.current) return;
+      const since = callingSinceRef.current;
+      if (since === null || Date.now() - since < CALLING_TIMEOUT_MS) return;
+      if (autoAttemptsRef.current >= MAX_AUTO_ATTEMPTS) {
+        dbg("watchdog menyerah → failed");
+        setStatus("failed");
+        return;
+      }
+      autoAttemptsRef.current += 1;
+      dbg("watchdog restart", autoAttemptsRef.current);
+      callingSinceRef.current = Date.now();
+      closePc(true);
+      setPendingOffer(null);
+      setStatus("calling");
+      sayHello();
+      if (isHostRef.current) void startHost();
+      // Guest: refs jawaban direset oleh closePc → offer berikutnya
+      // (bahkan SDP sama) dijawab segar.
+    }, WATCHDOG_MS);
+    return () => clearInterval(id);
+  }, [enabled, closePc, sayHello, startHost]);
 
   // Tambah track baru ke koneksi hidup (tanpa renegosiasi agresif).
   useEffect(() => {
@@ -302,15 +421,17 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
     dbg("retry");
     setPendingOffer(null);
     closePc();
+    autoAttemptsRef.current = 0;
+    callingSinceRef.current = Date.now();
     setStatus("calling");
     const id = myIdRef.current;
     if (!id) {
       setStatus("idle");
       return;
     }
-    void sendRef.current({ event: "call_hello", from: id }).catch(() => {});
+    sayHello();
     if (isHostRef.current) void startHost();
-  }, [closePc, startHost]);
+  }, [closePc, sayHello, startHost]);
 
   useEffect(() => closePc, [closePc]);
 

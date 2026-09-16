@@ -11,6 +11,10 @@ export interface RoomBundle {
 
 export interface CaptureBundle {
   sessionDbId: string;
+  // Jadwal 4 jepretan (jam server). Bundle lama tanpa ini → ambil dari get().
+  targetTimes?: [number, number, number, number];
+  captureMode?: "auto" | "manual";
+  timerOption?: number;
 }
 
 export interface ShotsBundle {
@@ -25,6 +29,10 @@ export interface ShotsBundle {
   partnerId: string | null;
   partnerPaths: (string | null)[];
   roomId: string | null;
+  // Rasio host saat sesi selesai — strip foto teman ikut rasio ini (akurat).
+  ratio?: "3:4" | "1:1" | "9:16";
+  // Mode satu HP (/sama): tanpa realtime, tombol kembali ke /sama.
+  solo?: boolean;
 }
 
 const store = () => (typeof window === "undefined" ? null : window.localStorage);

@@ -4,6 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type CameraStatus = "idle" | "requesting" | "ready" | "denied" | "unsupported" | "error";
 
+// Rasio foto pilihan user. captureShot crop tengah ke rasio ini agar
+// file = preview (WYSIWYG). Tersimpan per-browser seperti mirror.
+export type PhotoRatio = "3:4" | "1:1" | "9:16";
+export const PHOTO_RATIOS: PhotoRatio[] = ["3:4", "1:1", "9:16"];
+const RATIO_KEY = "pb_ratio";
+
+function ratioValue(r: PhotoRatio): number {
+  return r === "1:1" ? 1 : r === "9:16" ? 9 / 16 : 3 / 4;
+}
+
 // Camera hook (FR-03 + call). Video + mic untuk P2P call.
 // Ada tombol Cermin/Normal: preview dan file selalu sama.
 // Stream is stopped on unmount or via stop().
@@ -18,9 +28,19 @@ export function useCamera() {
   // Mirror selfie seperti cermin, tersimpan per-browser. Default nyala.
   // Dibaca di effect (bukan saat render) agar SSR dan client sama.
   const [mirrored, setMirrored] = useState<boolean>(true);
+  const [ratio, setRatio] = useState<PhotoRatio>("3:4");
 
   const toggleMirror = useCallback(() => {
     setMirrored((m) => !m);
+  }, []);
+
+  const cycleRatio = useCallback(() => {
+    setRatio((r) => PHOTO_RATIOS[(PHOTO_RATIOS.indexOf(r) + 1) % PHOTO_RATIOS.length]);
+  }, []);
+
+  // Dipakai guest untuk mengikuti rasio host (sudah divalidasi pengirim host).
+  const setRatioExternal = useCallback((r: PhotoRatio) => {
+    if (r === "3:4" || r === "1:1" || r === "9:16") setRatio(r);
   }, []);
 
   // Muat preferensi tersimpan setelah mount (sinkronisasi ↔ localStorage).
@@ -28,6 +48,8 @@ export function useCamera() {
   useEffect(() => {
     try {
       if (localStorage.getItem("ldr_mirror") === "off") setMirrored(false);
+      const saved = localStorage.getItem(RATIO_KEY);
+      if (saved === "1:1" || saved === "9:16" || saved === "3:4") setRatio(saved);
     } catch {
       /* abaikan */
     }
@@ -42,6 +64,14 @@ export function useCamera() {
       /* abaikan */
     }
   }, [mirrored]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RATIO_KEY, ratio);
+    } catch {
+      /* abaikan */
+    }
+  }, [ratio]);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -61,10 +91,10 @@ export function useCamera() {
     setStatus("requesting");
     setMessage(null);
     stop();
-    // Video + mic untuk saling lihat + bicara (P2P call).
+    // Video + mic untuk saling lihat + bicara (P2P call). Preview 720p (§13).
     const tries: MediaStreamConstraints[] = [
-      { video: { facingMode: "user" }, audio: true },
-      { video: true, audio: true },
+      { video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
       { video: { facingMode: "user" }, audio: false },
       { video: true, audio: false },
     ];
@@ -115,14 +145,42 @@ export function useCamera() {
 
   useEffect(() => stop, [stop]);
 
-  // Grab current frame → JPEG blob. Ikut mode mirror agar = preview.
+  // Tempel ulang stream ke elemen video tiap stream berubah — perbaiki
+  // balapan mount ↔ start (preview hitam walau status ready).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !stream) return;
+    if (v.srcObject !== stream) v.srcObject = stream;
+    v.muted = true;
+    v.play().catch(() => {
+      /* autoplay ditolak — user ketuk video untuk putar */
+    });
+  }, [stream]);
+
+  // Grab current frame → JPEG blob. Ikut mode mirror + crop tengah ke rasio
+  // terpilih agar file = preview (WYSIWYG).
   const captureShot = useCallback(
     async (maxSide = 1280, quality = 0.85): Promise<Blob> => {
       const video = videoRef.current;
       if (!video || !video.videoWidth) throw new Error("kamera belum siap");
-      const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
-      const w = Math.round(video.videoWidth * scale);
-      const h = Math.round(video.videoHeight * scale);
+      const target = ratioValue(ratio);
+      let sw = video.videoWidth;
+      let sh = video.videoHeight;
+      const current = sw / sh;
+      let sx = 0;
+      let sy = 0;
+      if (current > target) {
+        // Terlalu lebar → potong kiri-kanan.
+        sw = Math.round(sh * target);
+        sx = Math.round((video.videoWidth - sw) / 2);
+      } else if (current < target) {
+        // Terlalu tinggi → potong atas-bawah.
+        sh = Math.round(sw / target);
+        sy = Math.round((video.videoHeight - sh) / 2);
+      }
+      const scale = Math.min(1, maxSide / Math.max(sw, sh));
+      const w = Math.round(sw * scale);
+      const h = Math.round(sh * scale);
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
@@ -131,13 +189,13 @@ export function useCamera() {
         ctx.translate(w, 0);
         ctx.scale(-1, 1);
       }
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
       if (!blob) throw new Error("gagal mengambil foto");
       return blob;
     },
-    [mirrored],
+    [mirrored, ratio],
   );
 
-  return { videoRef, status, message, start, stop, captureShot, mirrored, toggleMirror, stream, muted, toggleMute, audioOn };
+  return { videoRef, status, message, start, stop, captureShot, mirrored, toggleMirror, ratio, cycleRatio, setRatio: setRatioExternal, stream, muted, toggleMute, audioOn };
 }

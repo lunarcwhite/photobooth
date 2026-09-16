@@ -10,23 +10,29 @@ import { usePeerCall } from "@/hooks/usePeerCall";
 import { uploadShot, blobToDataURL } from "@/lib/storage/exchange";
 import { track } from "@/lib/analytics/events";
 import type { RoomBroadcastEvent } from "@/types/realtime";
-import { Btn, GhostBtn, Card, ErrorMsg } from "@/components/ui";
+import { Btn, GhostBtn, Card, ErrorMsg, StepBadge } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
 import { RemoteView } from "@/components/RemoteView";
 import { getServerOffset, correctedNow } from "@/lib/realtime/clock";
 import { supabase } from "@/lib/supabase/client";
 import { roomApi } from "@/lib/room/api";
+import { AlertIcon, BackIcon, CameraIcon, CheckIcon, ClockIcon, MicIcon, MicOffIcon } from "@/components/icons";
 
-// Capture manual: host menekan tombol per foto → broadcast shot_armed
-// dengan targetAt = correctedNow + 5000ms → kedua HP countdown 5→1 →
-// jepret bareng. Guest hanya menunggu. Upload/ACK/result sama seperti dulu.
-const COUNTDOWN_MS = 5000;
-
+// Capture otomatis: jadwal 4 targetTimes jam server dari room-api.start.
+// Host: after session_started kirim mismo ke guest. Guest: bundle lama
+// tanpa targetTimes → ambil via room-api.get lalu pasang. Kedua HP
+// countdown lokal 3-2-1 per target + jepret bareng (PRD §6).
 interface ShotState {
-  armedAt: number | null; // targetAt dari shot_armed
   done: boolean;
   uploading: boolean;
 }
+
+const TIMER_OPTIONS = [
+  { val: 0, label: "0s", desc: "Langsung jepret (khusus manual)" },
+  { val: 3, label: "3s", desc: "Hitung mundur 3 detik" },
+  { val: 5, label: "5s", desc: "Hitung mundur 5 detik" },
+  { val: 10, label: "10s", desc: "Hitung mundur 10 detik" },
+];
 
 export default function CapturePage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = use(params);
@@ -43,21 +49,45 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   // Init 0 agar render server = client; jam nyata diisi effect setelah mount.
   const [now, setNow] = useState(0);
   const [shots, setShots] = useState<ShotState[]>([
-    { armedAt: null, done: false, uploading: false },
-    { armedAt: null, done: false, uploading: false },
-    { armedAt: null, done: false, uploading: false },
-    { armedAt: null, done: false, uploading: false },
+    { done: false, uploading: false },
+    { done: false, uploading: false },
+    { done: false, uploading: false },
+    { done: false, uploading: false },
   ]);
+  const [targetTimes, setTargetTimes] = useState<[number, number, number, number] | null>(null);
+  const [captureMode, setCaptureMode] = useState<"auto" | "manual">("auto");
+  const [timerOption, setTimerOption] = useState<number>(3);
+  const [armedShot, setArmedShot] = useState<{ sequence: number; targetAt: number } | null>(null);
+
+  const [flash, setFlash] = useState(false);
   const [myShots, setMyShots] = useState<(string | null)[]>([null, null, null, null]);
   const [partnerPaths, setPartnerPaths] = useState<(string | null)[]>([null, null, null, null]);
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const [arming, setArming] = useState(false);
-  const [partnerName, setPartnerName] = useState("Pasangan");
+  const [partnerName, setPartnerName] = useState("Teman");
   const [callPeerId, setCallPeerId] = useState<string | null>(null);
   const [endedByHost, setEndedByHost] = useState(false);
   const callSignalRef = useRef<(e: RoomBroadcastEvent) => void>(() => {});
+  const sendRef = useRef<(e: RoomBroadcastEvent) => Promise<void>>(async () => {});
+
+  // Rasio & Mode dikunci ke host — refs agar handler selalu baca nilai terbaru.
+  const isHostRef = useRef(false);
+  const ratioRef = useRef(cam.ratio);
+  const myPidRef = useRef("");
+  const setRatioRef = useRef(cam.setRatio);
+  const captureModeRef = useRef(captureMode);
+  const timerOptionRef = useRef(timerOption);
+  const armedShotRef = useRef(armedShot);
+  useEffect(() => {
+    isHostRef.current = bundle?.role === "host";
+    ratioRef.current = cam.ratio;
+    myPidRef.current = bundle?.participantId ?? "";
+    setRatioRef.current = cam.setRatio;
+    captureModeRef.current = captureMode;
+    timerOptionRef.current = timerOption;
+    armedShotRef.current = armedShot;
+  });
   const bgQueue = useRef<{ seq: number; blob: Blob; tries: number }[]>([]);
   const firedRef = useRef<boolean[]>([false, false, false, false]);
 
@@ -88,18 +118,47 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       partnerId,
       partnerPaths,
       roomId: bundle.roomId,
+      ratio: cam.ratio,
     });
     router.push(`/room/${code}/result`);
   }
 
   function onEvent(e: RoomBroadcastEvent) {
-    if (e.event === "shot_armed" && e.sequence >= 1 && e.sequence <= 4) {
-      setShots((prev) => {
-        if (prev[e.sequence - 1].done) return prev;
-        const next = [...prev];
-        next[e.sequence - 1] = { ...next[e.sequence - 1], armedAt: e.targetAt };
-        return next;
-      });
+    if (e.event === "ratio_changed") {
+      if (!isHostRef.current && (e.ratio === "3:4" || e.ratio === "1:1" || e.ratio === "9:16")) {
+        setRatioRef.current(e.ratio);
+      }
+    } else if (e.event === "ratio_request") {
+      if (isHostRef.current && myPidRef.current) {
+        void sendRef.current({ event: "ratio_changed", from: myPidRef.current, ratio: ratioRef.current }).catch(() => {});
+      }
+    } else if (e.event === "session_started") {
+      if (Array.isArray(e.targetTimes) && e.targetTimes.length === 4) {
+        setTargetTimes(e.targetTimes);
+      }
+      if (e.mode) setCaptureMode(e.mode);
+      if (typeof e.timerOption === "number") setTimerOption(e.timerOption);
+    } else if (e.event === "config_changed") {
+      if (!isHostRef.current) {
+        setCaptureMode(e.mode);
+        setTimerOption(e.timerOption);
+        if (e.mode === "manual") {
+          setArmedShot(null);
+        }
+      }
+    } else if (e.event === "config_request") {
+      if (isHostRef.current && myPidRef.current) {
+        void sendRef.current({
+          event: "config_changed",
+          from: myPidRef.current,
+          mode: captureModeRef.current,
+          timerOption: timerOptionRef.current,
+        }).catch(() => {});
+      }
+    } else if (e.event === "shot_armed") {
+      setArmedShot({ sequence: e.sequence, targetAt: e.targetAt });
+    } else if (e.event === "shot_cancelled") {
+      setArmedShot(null);
     } else if (e.event === "capture_ack" && e.sequence >= 1 && e.sequence <= 4 && e.participantId !== bundle?.participantId) {
       setPartnerId(e.participantId);
       setPartnerPaths((prev) => {
@@ -117,6 +176,25 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   }
 
   const { send } = useRoomChannel(code, me, onEvent);
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
+  // Rasio dikunci ke host: guest minta sekali saat masuk, host mengumumkan
+  // tiap berubah (termasuk mount) agar pindah waiting→capture tetap sinkron.
+  useEffect(() => {
+    if (!mounted || !bundle) return;
+    if (bundle.role !== "host") {
+      void send({ event: "ratio_request", from: bundle.participantId }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, bundle?.participantId, bundle?.role]);
+
+  useEffect(() => {
+    if (!mounted || !bundle || bundle.role !== "host") return;
+    void send({ event: "ratio_changed", from: bundle.participantId, ratio: cam.ratio }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, bundle?.participantId, bundle?.role, cam.ratio]);
 
   // P2P call berlanjut dari ruang tunggu (peer id dikenali via presence/get).
   const call = usePeerCall({
@@ -132,10 +210,29 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   });
 
   // Baca storage setelah mount: sinkronisasi React ↔ browser storage.
+  // Jadwal dipasang berlapis: bundle → room-api.get (untuk bundle lama).
   /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi mount ↔ storage browser, sah */
   useEffect(() => {
-    setBundle(loadRoomBundle(code));
-    setCapture(loadCaptureBundle(code));
+    const b = loadRoomBundle(code);
+    const c = loadCaptureBundle(code);
+    setBundle(b);
+    setCapture(c);
+    if (c?.captureMode) setCaptureMode(c.captureMode);
+    if (typeof c?.timerOption === "number") setTimerOption(c.timerOption);
+    if (c?.targetTimes) setTargetTimes(c.targetTimes);
+    else if (c && (!c.captureMode || c.captureMode === "auto")) {
+      roomApi.get(code).then(
+        (r) => {
+          if (r.activeSession && r.activeSession.sessionDbId === c.sessionDbId) {
+            setTargetTimes(r.activeSession.targetTimes);
+          }
+        },
+        () => {
+          track("session_failed", b?.roomId, { reason: "no_schedule" });
+          setError("Jadwal foto tidak ketemu. Kembali ke booth dan mulai lagi.");
+        },
+      );
+    }
     setMounted(true);
   }, [code]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -171,13 +268,18 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tick 100ms untuk countdown presisi (timer eksternal → state).
+  // Tick untuk countdown presisi (timer eksternal → state).
+  // 100ms saat jadwal live / armed shot aktif; idle 1 dtk untuk antrean.
   /* eslint-disable react-hooks/set-state-in-effect -- sinkronisasi timer eksternal, sah */
+  const sessionLive =
+    shots.some((s) => !s.done) &&
+    ((captureMode === "auto" && targetTimes !== null) ||
+      (captureMode === "manual" && armedShot !== null));
   useEffect(() => {
     setNow(correctedNow(offset));
-    const id = setInterval(() => setNow(correctedNow(offset)), 100);
+    const id = setInterval(() => setNow(correctedNow(offset)), sessionLive ? 100 : 1000);
     return () => clearInterval(id);
-  }, [offset]);
+  }, [offset, sessionLive]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const [tabHidden, setTabHidden] = useState(false);
@@ -213,7 +315,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         track("capture_completed", bundle.roomId, { shot: seq });
       } catch {
         if (tries < 1) {
-          // Retry 1x; setelah itu slot pasangan jadi placeholder (§14).
+          // Retry 1x; setelah itu slot teman jadi placeholder (§14).
           bgQueue.current.push({ seq, blob, tries: tries + 1 });
         }
         setShots((s) => {
@@ -240,6 +342,9 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       if (!bundle || !sessionDbId) return;
       if (firedRef.current[index]) return;
       firedRef.current[index] = true;
+      // Shutter flash langsung — umpan balik fisik booth (DESIGN §8).
+      setFlash(true);
+      setTimeout(() => setFlash(false), 180);
       try {
         const blob = await cam.captureShot();
         const url = await blobToDataURL(blob);
@@ -257,12 +362,8 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         void doUpload(index + 1, blob);
       } catch {
         firedRef.current[index] = false;
-        setShots((s) => {
-          const n = [...s];
-          n[index] = { ...n[index], armedAt: null };
-          return n;
-        });
-        setError(`Foto ${index + 1} gagal diambil, coba tekan lagi.`);
+        setError(`Foto ${index + 1} gagal diambil — sesi tetap lanjut.`);
+        track("session_failed", bundle.roomId, { shot: index + 1 });
       }
     },
     [bundle, sessionDbId, cam, doUpload],
@@ -271,44 +372,139 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   // Cek tiap tick: tembak shot yang targetAt-nya lewat dan belum fired.
   useEffect(() => {
     if (!cameraReady) return;
-    shots.forEach((s, i) => {
-      if (s.armedAt !== null && !s.done && now >= s.armedAt) void fireShot(i);
-    });
-  }, [now, shots, cameraReady, fireShot]);
-
-  // Host memicu satu foto: target 5 detik dari jam terkoreksi.
-  const armShot = async (index: number) => {
-    if (!isHost || !sessionDbId || arming) return;
-    if (shots[index].done || shots[index].armedAt !== null) return;
-    setArming(true);
-    setError(null);
-    try {
-      const targetAt = correctedNow(offset) + COUNTDOWN_MS;
-      await send({
-        event: "shot_armed",
-        sessionId: sessionDbId,
-        sequence: (index + 1) as 1 | 2 | 3 | 4,
-        targetAt,
+    if (captureMode === "auto" && targetTimes) {
+      shots.forEach((s, i) => {
+        if (!s.done && targetTimes[i] > 0 && now >= targetTimes[i]) void fireShot(i);
       });
-      setShots((prev) => {
-        const next = [...prev];
-        next[index] = { ...next[index], armedAt: targetAt };
-        return next;
-      });
-    } catch {
-      setError("Gagal memicu foto. Coba lagi.");
-    } finally {
-      setArming(false);
     }
-  };
+    if (captureMode === "manual" && armedShot) {
+      const idx = armedShot.sequence - 1;
+      if (idx >= 0 && idx < 4 && !shots[idx].done && now >= armedShot.targetAt) {
+        void fireShot(idx);
+        setArmedShot(null);
+      }
+    }
+  }, [now, shots, cameraReady, captureMode, targetTimes, armedShot, fireShot]);
 
   const doneCount = shots.filter((s) => s.done).length;
   const allDone = doneCount === 4;
-  const armedIndex = shots.findIndex((s) => s.armedAt !== null && !s.done);
-  const armedRemaining = armedIndex >= 0 && shots[armedIndex].armedAt !== null
-    ? Math.max(0, (shots[armedIndex].armedAt as number) - now)
-    : 0;
-  const countdown = armedIndex >= 0 ? Math.ceil(armedRemaining / 1000) : 0;
+  const nextUnfinishedIndex = shots.findIndex((s) => !s.done);
+
+  // Foto aktif & hitung mundur dinamis
+  const activeIndex =
+    captureMode === "auto" && targetTimes
+      ? targetTimes.findIndex((t, i) => !shots[i].done && t > 0 && now < t)
+      : captureMode === "manual" && armedShot
+        ? armedShot.sequence - 1
+        : -1;
+
+  const countdown =
+    captureMode === "auto" && activeIndex >= 0 && targetTimes && targetTimes[activeIndex] > 0
+      ? Math.max(0, Math.ceil((targetTimes[activeIndex] - now) / 1000))
+      : captureMode === "manual" && armedShot
+        ? Math.max(0, Math.ceil((armedShot.targetAt - now) / 1000))
+        : 0;
+
+  // Aksi Shutter Manual oleh Host
+  const triggerManualShot = useCallback(async () => {
+    if (!bundle || !sessionDbId || armedShotRef.current || shots.every((s) => s.done)) return;
+    const nextIdx = shots.findIndex((s) => !s.done);
+    if (nextIdx === -1) return;
+
+    const currentTimer = timerOptionRef.current;
+    const buffer = currentTimer === 0 ? 250 : 200;
+    const targetAt = correctedNow(offset) + currentTimer * 1000 + buffer;
+    const seq = (nextIdx + 1) as 1 | 2 | 3 | 4;
+
+    setArmedShot({ sequence: seq, targetAt });
+    await sendRef.current({
+      event: "shot_armed",
+      sessionId: sessionDbId,
+      sequence: seq,
+      targetAt,
+    });
+  }, [bundle, sessionDbId, shots, offset]);
+
+  const cancelManualCountdown = useCallback(async () => {
+    if (!bundle || !sessionDbId || !armedShotRef.current) return;
+    const seq = armedShotRef.current.sequence as 1 | 2 | 3 | 4;
+    setArmedShot(null);
+    await sendRef.current({
+      event: "shot_cancelled",
+      sessionId: sessionDbId,
+      sequence: seq,
+    });
+  }, [bundle, sessionDbId]);
+
+  // Penggantian live Mode & Timer oleh Host saat sesi berlangsung
+  const switchMode = useCallback(
+    async (newMode: "auto" | "manual") => {
+      if (newMode === captureModeRef.current || !isHostRef.current || !sessionDbId) return;
+      setCaptureMode(newMode);
+      setArmedShot(null);
+
+      let newTargetTimes: [number, number, number, number] = [0, 0, 0, 0];
+      if (newMode === "auto") {
+        const delay = timerOptionRef.current * 1000 + 4000;
+        let t = Date.now() + (timerOptionRef.current === 0 ? 1500 : timerOptionRef.current * 1000 + 1000);
+        const times: [number, number, number, number] = [0, 0, 0, 0];
+        shots.forEach((s, i) => {
+          if (!s.done) {
+            times[i] = t;
+            t += delay;
+          }
+        });
+        newTargetTimes = times;
+        setTargetTimes(times);
+      } else {
+        setTargetTimes([0, 0, 0, 0]);
+      }
+
+      await sendRef.current({
+        event: "config_changed",
+        from: myPidRef.current,
+        mode: newMode,
+        timerOption: timerOptionRef.current,
+      });
+      if (newMode === "auto") {
+        await sendRef.current({
+          event: "session_started",
+          sessionId: sessionDbId,
+          totalShots: 4,
+          targetTimes: newTargetTimes,
+          mode: "auto",
+          timerOption: timerOptionRef.current,
+        });
+      }
+    },
+    [sessionDbId, shots],
+  );
+
+  const switchTimer = useCallback(
+    async (newTimer: number) => {
+      if (!isHostRef.current || newTimer === timerOptionRef.current || !sessionDbId) return;
+      setTimerOption(newTimer);
+      await sendRef.current({
+        event: "config_changed",
+        from: myPidRef.current,
+        mode: captureModeRef.current,
+        timerOption: newTimer,
+      });
+    },
+    [sessionDbId],
+  );
+
+  // Shortcut spasi untuk host di mode manual
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && isHost && captureMode === "manual" && !armedShot && !allDone) {
+        e.preventDefault();
+        void triggerManualShot();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isHost, captureMode, armedShot, allDone, triggerManualShot]);
 
   const finish = async () => {
     if (finishing || !sessionDbId || !bundle) return;
@@ -326,7 +522,9 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   if (!mounted || !bundle || !capture) {
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
-        <p className="text-center text-sm text-zinc-500">Menyiapkan sesi foto...</p>
+        <p className="flex items-center justify-center gap-2 text-sm font-semibold text-booth-muted dark:text-booth-creamdim">
+          <ClockIcon size={16} /> Menyiapkan sesi foto…
+        </p>
       </main>
     );
   }
@@ -336,14 +534,11 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
         <Card>
           <div className="flex flex-col items-center gap-3 text-center">
-            <p className="text-4xl" aria-hidden>
-              👋
+            <h1 className="font-display text-xl font-bold">Room {code} berakhir</h1>
+            <p className="text-sm text-booth-muted dark:text-booth-creamdim">
+              Host mengakhiri room ini. Terima kasih sudah mampir.
             </p>
-            <h1 className="text-xl font-bold">Room {code} berakhir</h1>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Host mengakhiri room ini. Terima kasih sudah mampir!
-            </p>
-            <Btn
+            <GhostBtn
               onClick={() => {
                 clearRoomBundle(code);
                 clearCaptureBundle(code);
@@ -351,159 +546,329 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 router.push("/");
               }}
             >
-              Kembali ke Beranda
-            </Btn>
+              Kembali ke beranda
+            </GhostBtn>
           </div>
         </Card>
       </main>
     );
   }
 
+  const statusLine = !cameraReady
+    ? "Menyiapkan kamera…"
+    : allDone
+      ? "Dapat! Semua 4 foto jadi."
+      : captureMode === "manual"
+        ? armedShot
+          ? `Bersiap — foto ${armedShot.sequence} dari 4…`
+          : isHost
+            ? `Foto ${nextUnfinishedIndex + 1} dari 4 — tekan tombol jepret.`
+            : `Menunggu host menjepret foto ${nextUnfinishedIndex + 1} dari 4…`
+        : activeIndex >= 0
+          ? `Bersiap — foto ${activeIndex + 1} dari 4…`
+          : "Menyiapkan…";
+  const uploading = shots.some((s) => s.uploading);
+
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 py-6">
-      <div className="pop-in flex items-center justify-center gap-2">
-        <span className="font-display rounded-full bg-gradient-to-r from-pink-500 to-fuchsia-500 px-4 py-1 text-sm text-white shadow-[0_3px_0_#9d174d]">
-          📸 {doneCount}/4 foto
-        </span>
-        {shots.some((s) => s.uploading) && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-            mengunggah...
-          </span>
-        )}
-      </div>
+    <main className="flex h-dvh w-full flex-col gap-3 overflow-hidden px-4 py-3 md:px-8 lg:gap-4 lg:px-12 xl:mx-auto xl:max-w-[1500px] xl:px-14">
+      {/* Top Bar Header */}
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-booth-line/60 pb-3 dark:border-booth-nightline/60">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <StepBadge step="3" of="4" label="Sesi Foto" />
+            <h1 className="font-display mt-0.5 text-lg sm:text-xl font-bold tracking-tight text-booth-ink dark:text-booth-cream">
+              {statusLine}
+            </h1>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {uploading && (
+            <span className="text-xs font-semibold text-booth-muted dark:text-booth-creamdim animate-pulse">
+              Mengunggah foto…
+            </span>
+          )}
+          <div className="flex items-center gap-2 rounded-xl border border-booth-line bg-booth-card/60 px-3.5 py-1.5 dark:border-booth-nightline dark:bg-booth-nightcard/60" aria-label={`Progres ${doneCount} dari 4 foto`}>
+            <div className="flex items-center gap-1.5">
+              {[0, 1, 2, 3].map((i) => (
+                <span
+                  key={i}
+                  aria-hidden
+                  className={`h-2.5 w-6 sm:w-8 rounded-full transition-all duration-300 ${
+                    shots[i].done
+                      ? "bg-emerald-500 shadow-xs"
+                      : i === activeIndex
+                        ? "bg-booth-accent scale-y-125 animate-pulse"
+                        : "bg-booth-line dark:bg-booth-nightline"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="ml-1.5 text-xs font-bold tabular-nums text-booth-ink dark:text-booth-cream">{doneCount}/4</span>
+          </div>
+        </div>
+      </header>
+
       <ErrorMsg msg={error} />
+
       {tabHidden && (
-        <p role="alert" className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-sm font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Tab tidak aktif — kembali ke tab ini agar countdown tetap akurat.
+        <p role="alert" className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200 shadow-xs">
+          <AlertIcon size={16} className="text-amber-600 shrink-0" />
+          Tab tidak aktif — silakan kembali ke tab ini agar sinkronisasi hitung mundur tetap presisi.
         </p>
       )}
 
-      <div className="pop-in pop-in-1 grid grid-cols-2 gap-3">
-        <CameraView
-          videoRef={cam.videoRef}
-          ready={cameraReady}
-          label="Kamu"
-          mirrored={cam.mirrored}
-          onToggleMirror={cam.toggleMirror}
-        />
-        <RemoteView
-          remoteStream={call.remoteStream}
-          status={call.status}
-          name={partnerName}
-          onRetry={call.retry}
-        />
-      </div>
+      {/* Dual Camera Stage & Filmstrip Console */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row lg:gap-6">
+        {/* Stage Area */}
+        <div className="relative grid min-h-0 flex-1 grid-cols-2 grid-rows-1 gap-2 sm:gap-3 md:grid-cols-2 md:grid-rows-1 lg:gap-6">
+          <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden [container-type:size]">
+            <CameraView
+              videoRef={cam.videoRef}
+              stream={cam.stream}
+              ready={cameraReady}
+              label={`Kamu ${isHost ? "(Host)" : ""}`}
+              mirrored={cam.mirrored}
+              onToggleMirror={cam.toggleMirror}
+              ratio={cam.ratio}
+              onCycleRatio={isHost ? cam.cycleRatio : undefined}
+            />
+          </div>
+          <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden [container-type:size]">
+            <RemoteView
+              remoteStream={call.remoteStream}
+              status={call.status}
+              name={partnerName}
+              onRetry={call.retry}
+              ratio={cam.ratio}
+              hasPartner={true}
+            />
+          </div>
 
-      {cameraReady && cam.audioOn && (
-        <button
-          type="button"
-          onClick={cam.toggleMute}
-          className={`font-display w-full rounded-2xl border-2 px-5 py-2.5 text-sm transition active:translate-y-[2px] ${
-            cam.muted
-              ? "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
-              : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-          }`}
-        >
-          {cam.muted ? "🔇 Mic mati — ketuk untuk bicara" : "🎙️ Mic nyala — ketuk untuk bisu"}
-        </button>
-      )}
-
-      <div className="rounded-3xl border-2 border-white bg-white/85 p-5 text-center shadow-[0_6px_24px_-8px_rgba(219,39,119,0.35)] backdrop-blur dark:border-white/10 dark:bg-zinc-900/85">
-        {!cameraReady ? (
-          <p className="text-sm font-semibold text-zinc-500">Menyiapkan kamera... 📷</p>
-        ) : armedIndex >= 0 ? (
-          <>
-            <p className="font-display text-sm text-pink-600 dark:text-pink-300">Foto {armedIndex + 1} dari 4 — bersiap!</p>
-            <p
-              key={armedIndex}
-              className="countdown-num font-display mt-1 bg-gradient-to-r from-pink-600 via-rose-500 to-amber-500 bg-clip-text text-7xl font-bold tabular-nums text-transparent"
-              aria-live="polite"
-            >
-              {countdown}
-            </p>
-            <div className="mx-auto mt-2 h-2.5 w-40 overflow-hidden rounded-full bg-pink-100 dark:bg-pink-950">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-pink-500 to-amber-400 transition-[width] duration-100"
-                style={{ width: `${Math.min(100, Math.max(0, (armedRemaining / 5000) * 100))}%` }}
-              />
+          {/* Focused Centered Countdown Badge */}
+          {cameraReady && (countdown > 0 || (captureMode === "manual" && armedShot && countdown === 0)) && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+              <div className="flex flex-col items-center justify-center rounded-3xl bg-black/75 px-10 py-7 text-center text-white backdrop-blur-md border border-white/20 shadow-2xl">
+                <span className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">
+                  Bersiap · Foto {armedShot ? armedShot.sequence : activeIndex + 1} dari 4
+                </span>
+                <span
+                  key={`${activeIndex}-${countdown}`}
+                  className="countdown-num font-display text-7xl md:text-9xl font-bold text-white tabular-nums my-1"
+                  aria-live="polite"
+                >
+                  {countdown > 0 ? countdown : "✦"}
+                </span>
+                <span className="text-[11px] font-medium text-white/60">
+                  {countdown > 0 ? "Pasang pose terbaikmu!" : "Jepret!"}
+                </span>
+              </div>
             </div>
-          </>
-        ) : allDone ? (
-          <>
-            <p className="text-4xl" aria-hidden>🎉</p>
-            <p className="font-display mt-1 text-lg">Semua 4 foto selesai!</p>
-            <p className="mt-1 text-sm text-zinc-500">
-              Foto pasangan yang belum tiba tampil sebagai placeholder dan bisa dimuat ulang di halaman hasil.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="font-display text-base">
-              {isHost ? "📸 Siap? Tekan tombol foto!" : "⏳ Menunggu host menekan tombol..."}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500">
-              {isHost ? "Pose dulu bareng, baru tekan saat momennya pas." : "Siapkan pose terbaikmu!"}
-            </p>
-          </>
-        )}
-      </div>
+          )}
 
-      <div className="grid grid-cols-2 gap-2">
-        {[0, 1, 2, 3].map((i) => {
-          const s = shots[i];
-          return isHost ? (
-            <Btn
-              key={i}
-              onClick={() => armShot(i)}
-              disabled={!cameraReady || s.done || s.armedAt !== null || armedIndex >= 0 || arming}
-              className={s.done ? "from-emerald-500 via-emerald-500 to-teal-500 shadow-[0_4px_0_#065f46]" : ""}
-            >
-              {s.done
-                ? `Foto ${i + 1} ✓`
-                : s.armedAt !== null
-                  ? `${Math.ceil(Math.max(0, ((s.armedAt as number) - now)) / 1000)}...`
-                  : arming
-                    ? "..."
-                    : `📸 Foto ${i + 1}`}
-            </Btn>
-          ) : (
-            <div
-              key={i}
-              className={`font-display rounded-2xl border-2 px-5 py-3.5 text-center text-base ${s.done ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "border-violet-200 bg-white/70 text-zinc-500 dark:border-violet-900 dark:bg-zinc-900/70"}`}
-            >
-              {s.done ? `Foto ${i + 1} ✓` : `Foto ${i + 1}`}
+          {flash && (
+            <div className="pointer-events-none absolute inset-0 bg-white z-30 transition-opacity duration-150" aria-hidden />
+          )}
+        </div>
+
+        {/* Sidebar Filmstrip Console */}
+        <div className="flex shrink-0 flex-col gap-2.5 sm:gap-3 landscape:min-h-0 landscape:w-56 landscape:justify-center landscape:overflow-y-auto md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-76 lg:overflow-visible">
+          {/* Filmstrip Card */}
+          <div className="booth-card rounded-2xl p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-booth-muted dark:text-booth-creamdim">
+                Strip Foto ({doneCount}/4)
+              </p>
+              <span className="text-[10px] font-semibold text-booth-accent">
+                {captureMode === "auto" ? "✨ Auto" : "📸 Manual"} ({timerOption}s)
+              </span>
             </div>
-          );
-        })}
-      </div>
 
-      <div className="grid grid-cols-4 gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className={`aspect-square overflow-hidden rounded-2xl border-2 bg-white/70 dark:bg-zinc-900/70 ${shots[i].done ? "pop-in border-emerald-300 shadow-[0_3px_0_#059669]" : "border-white"}`}
-          >
-            {myShots[i] ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data: URL jepretan lokal; next/image tidak bisa optimasi
-              <img src={myShots[i]!} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
+            <div className="grid grid-cols-4 gap-2 landscape:grid-cols-2 md:grid-cols-2 lg:gap-2.5">
+              {[0, 1, 2, 3].map((i) => {
+                const ar = cam.ratio === "1:1" ? "aspect-square" : cam.ratio === "9:16" ? "aspect-[9/16]" : "aspect-[3/4]";
+                const done = shots[i].done;
+                const isActive = i === activeIndex;
+
+                return (
+                  <div key={i} className="flex flex-col items-center">
+                    <div
+                      className={`relative w-full ${ar} overflow-hidden rounded-xl border-2 transition-all duration-200 bg-booth-night shadow-sm ${
+                        done
+                          ? "border-emerald-500 shadow-emerald-500/10"
+                          : isActive
+                            ? "border-booth-accent ring-2 ring-booth-accent/30"
+                            : "border-booth-line/70 dark:border-booth-nightline/70"
+                      }`}
+                    >
+                      {myShots[i] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={myShots[i]!}
+                          alt={`Foto ${i + 1} berhasil diambil`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-white/40" aria-hidden>
+                          {isActive ? (
+                            <CameraIcon size={20} className="text-booth-accent animate-pulse" />
+                          ) : (
+                            <span className="text-xs font-bold tabular-nums">#{i + 1}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {done && (
+                        <span className="absolute right-1.5 bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs" aria-hidden>
+                          <CheckIcon size={12} strokeWidth={2.5} />
+                        </span>
+                      )}
+
+                      {isActive && !done && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <span key={countdown} className="countdown-num font-display text-2xl font-bold text-white tabular-nums">
+                            {countdown > 0 ? countdown : "✦"}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-semibold text-booth-muted dark:text-booth-creamdim mt-1 tabular-nums">
+                      Foto {i + 1}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick Mode & Timer Switcher (Host only, when not finished) */}
+          {isHost && !allDone && (
+            <div className="booth-card rounded-xl p-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-booth-muted">
+                  Atur Mode Jepret
+                </span>
+                <span className="text-[9px] text-booth-muted">Spasi = Jepret</span>
+              </div>
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="inline-flex rounded-lg border border-booth-line bg-black/[0.04] p-0.5 dark:border-booth-nightline dark:bg-white/[0.05]">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("auto")}
+                    className={`rounded-md py-1 px-2 text-[10px] font-semibold transition cursor-pointer ${
+                      captureMode === "auto"
+                        ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
+                        : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                    }`}
+                  >
+                    ✨ Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMode("manual")}
+                    className={`rounded-md py-1 px-2 text-[10px] font-semibold transition cursor-pointer ${
+                      captureMode === "manual"
+                        ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
+                        : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                    }`}
+                  >
+                    📸 Manual
+                  </button>
+                </div>
+
+                {/* Timer Pills */}
+                <div className="inline-flex rounded-lg border border-booth-line bg-black/[0.04] p-0.5 dark:border-booth-nightline dark:bg-white/[0.05]">
+                  {TIMER_OPTIONS.map((t) => {
+                    const isSelected = timerOption === t.val;
+                    const isDisabled = captureMode === "auto" && t.val === 0;
+                    return (
+                      <button
+                        key={t.val}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => switchTimer(t.val)}
+                        className={`rounded-md py-1 px-1.5 text-[10px] font-bold tabular-nums transition ${
+                          isSelected
+                            ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
+                            : isDisabled
+                              ? "opacity-30 cursor-not-allowed text-booth-muted"
+                              : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim cursor-pointer"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Audio Mute Toggle */}
+          {cameraReady && cam.audioOn && (
+            <button
+              type="button"
+              onClick={cam.toggleMute}
+              className="flex min-h-[38px] w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-booth-line bg-booth-card px-3 py-1.5 text-xs font-semibold text-booth-ink hover:bg-black/[0.04] transition active:translate-y-px dark:border-booth-nightline dark:bg-booth-nightcard dark:text-booth-cream cursor-pointer"
+            >
+              {cam.muted ? <MicOffIcon size={15} className="text-red-500" /> : <MicIcon size={15} className="text-emerald-500" />}
+              <span>{cam.muted ? "Mic Bisu (Ketuk Bicara)" : "Mic Aktif"}</span>
+            </button>
+          )}
+
+          {/* Selesai / Action Console */}
+          <div className="mt-auto pt-1 flex flex-col gap-2">
+            {allDone ? (
+              <Btn tone="accent" onClick={finish} disabled={finishing} className="text-base py-3.5 shadow-lg">
+                {finishing ? "Menyusun Foto…" : "Lihat Hasil Foto ✦"}
+              </Btn>
+            ) : captureMode === "manual" ? (
+              isHost ? (
+                armedShot ? (
+                  <button
+                    type="button"
+                    onClick={cancelManualCountdown}
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-red-500/80 bg-red-50 py-2.5 px-4 text-xs font-bold text-red-700 hover:bg-red-100 transition active:scale-[0.98] dark:border-red-500/60 dark:bg-red-950/40 dark:text-red-300 cursor-pointer"
+                  >
+                    <span>Batal Hitung Mundur Foto {armedShot.sequence}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={triggerManualShot}
+                    className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-2xl bg-booth-accent py-3 px-4 text-sm font-bold text-white shadow-lg hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                  >
+                    <CameraIcon size={18} />
+                    <span>
+                      {timerOption === 0
+                        ? `Jepret Foto ${nextUnfinishedIndex + 1} Sekarang`
+                        : `Jepret Foto ${nextUnfinishedIndex + 1} (${timerOption}s)`}
+                    </span>
+                  </button>
+                )
+              ) : (
+                <div className="rounded-xl border border-booth-line/70 bg-black/[0.02] p-2.5 text-center text-xs text-booth-muted dark:border-booth-nightline/70 dark:text-booth-creamdim">
+                  {armedShot
+                    ? `✦ Bersiap! Foto ${armedShot.sequence} sedang dihitung mundur (${countdown}s)…`
+                    : `Menunggu Host menekan tombol jepret foto ${nextUnfinishedIndex + 1}…`}
+                </div>
+              )
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-xl text-zinc-300" aria-hidden>
-                {i + 1}
+              <div className="rounded-xl border border-booth-line/70 bg-black/[0.02] p-2.5 text-center text-xs text-booth-muted dark:border-booth-nightline/70 dark:text-booth-creamdim">
+                Hitung mundur berjalan otomatis ({timerOption}s) per foto.
               </div>
             )}
+
+            <button
+              onClick={() => router.push(`/room/${code}`)}
+              className="flex items-center justify-center gap-1.5 py-1 text-center text-xs font-semibold text-booth-muted hover:text-booth-ink transition dark:text-booth-creamdim dark:hover:text-white cursor-pointer"
+            >
+              <BackIcon size={13} />
+              Kembali ke ruang tunggu
+            </button>
           </div>
-        ))}
+        </div>
       </div>
-
-      {allDone && (
-        <GhostBtn onClick={finish} disabled={finishing} className="pop-in text-lg">
-          {finishing ? "Menyiapkan hasil... ✨" : "Lihat Hasil 🎉"}
-        </GhostBtn>
-      )}
-
-      <button onClick={() => router.push(`/room/${code}`)} className="text-center text-sm font-semibold text-zinc-400">
-        Kembali ke ruang tunggu
-      </button>
     </main>
   );
 }

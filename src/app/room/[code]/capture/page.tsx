@@ -596,19 +596,43 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const uploading = shots.some((s) => s.uploading);
 
   return (
-    <main className="flex h-dvh w-full flex-col gap-3 overflow-hidden px-4 py-3 md:px-8 lg:gap-4 lg:px-12 xl:mx-auto xl:max-w-[1500px] xl:px-14">
+    <main className="flex h-dvh w-full flex-col gap-2 overflow-hidden px-3 py-2 sm:px-4 sm:py-3 md:gap-3 md:px-8 lg:gap-4 lg:px-12 xl:mx-auto xl:max-w-[1500px] xl:px-14">
       {/* Top Bar Header */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-booth-line/60 pb-3 dark:border-booth-nightline/60">
-        <div className="flex items-center gap-3">
+      <header className="flex shrink-0 items-center justify-between gap-2.5 border-b border-booth-line/60 pb-2 dark:border-booth-nightline/60">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="min-w-0">
-            <StepBadge step="3" of="4" label="Sesi Foto" />
-            <h1 className="font-display mt-0.5 text-lg sm:text-xl font-bold tracking-tight text-booth-ink dark:text-booth-cream truncate">
+            <div className="flex items-center gap-1.5">
+              <StepBadge step="3" of="4" label="Sesi Foto" />
+              {uploading && (
+                <span className="text-[10px] sm:text-xs font-semibold text-booth-muted dark:text-booth-creamdim animate-pulse hidden xs:inline">
+                  Mengunggah…
+                </span>
+              )}
+            </div>
+            <h1 className="font-display mt-0.5 text-sm sm:text-base md:text-lg font-bold tracking-tight text-booth-ink dark:text-booth-cream truncate">
               {statusLine}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Audio Mic Mute Toggle */}
+          {cameraReady && cam.audioOn && (
+            <button
+              type="button"
+              onClick={cam.toggleMute}
+              title={cam.muted ? "Nyalakan mic" : "Bisukan mic"}
+              className={`flex h-8 w-8 items-center justify-center rounded-xl border transition cursor-pointer ${
+                cam.muted
+                  ? "border-red-400/50 bg-red-500/10 text-red-500 hover:bg-red-500/20 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-400"
+                  : "border-booth-line bg-booth-card/60 text-emerald-600 hover:bg-black/[0.04] dark:border-booth-nightline dark:bg-booth-nightcard/60 dark:text-emerald-400"
+              }`}
+            >
+              {cam.muted ? <MicOffIcon size={16} /> : <MicIcon size={16} />}
+            </button>
+          )}
+
+          {/* Sound Toggle */}
           <button
             type="button"
             onClick={toggleSound}
@@ -617,28 +641,25 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
           >
             {soundMuted ? "🔇" : "🔊"}
           </button>
-          {uploading && (
-            <span className="text-xs font-semibold text-booth-muted dark:text-booth-creamdim animate-pulse">
-              Mengunggah foto…
-            </span>
-          )}
-          <div className="flex items-center gap-2 rounded-xl border border-booth-line bg-booth-card/60 px-3.5 py-1.5 dark:border-booth-nightline dark:bg-booth-nightcard/60" aria-label={`Progres ${doneCount} dari 4 foto`}>
-            <div className="flex items-center gap-1.5">
+
+          {/* Progress Indicator */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-booth-line bg-booth-card/60 px-2.5 py-1 sm:px-3 sm:py-1.5 dark:border-booth-nightline dark:bg-booth-nightcard/60" aria-label={`Progres ${doneCount} dari 4 foto`}>
+            <div className="flex items-center gap-1">
               {[0, 1, 2, 3].map((i) => (
                 <span
                   key={i}
                   aria-hidden
-                  className={`h-2.5 w-6 sm:w-8 rounded-full transition-all duration-300 ${
+                  className={`h-2 w-2 sm:h-2.5 sm:w-5 md:w-6 rounded-full transition-all duration-300 ${
                     shots[i].done
                       ? "bg-emerald-500 shadow-xs"
                       : i === activeIndex
-                        ? "bg-booth-accent scale-y-125 animate-pulse"
+                        ? "bg-booth-accent scale-110 sm:scale-y-125 animate-pulse"
                         : "bg-booth-line dark:bg-booth-nightline"
                   }`}
                 />
               ))}
             </div>
-            <span className="ml-1.5 text-xs font-bold tabular-nums text-booth-ink dark:text-booth-cream">{doneCount}/4</span>
+            <span className="ml-1 text-[11px] sm:text-xs font-bold tabular-nums text-booth-ink dark:text-booth-cream">{doneCount}/4</span>
           </div>
         </div>
       </header>
@@ -646,15 +667,15 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       <ErrorMsg msg={error} />
 
       {tabHidden && (
-        <p role="alert" className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200 shadow-xs">
-          <AlertIcon size={16} className="text-amber-600 shrink-0" />
+        <p role="alert" className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-center text-[11px] sm:text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200 shadow-xs">
+          <AlertIcon size={15} className="text-amber-600 shrink-0" />
           Tab tidak aktif — silakan kembali ke tab ini agar sinkronisasi hitung mundur tetap presisi.
         </p>
       )}
 
       {/* Dual Camera Stage & Filmstrip Console */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row lg:gap-6">
-        {/* Stage Area */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 md:flex-row md:gap-4 lg:gap-6">
+        {/* Stage Area: Expanded to fill viewport on mobile */}
         <div className="relative grid min-h-0 flex-1 grid-cols-2 grid-rows-1 gap-2 sm:gap-3 md:grid-cols-2 md:grid-rows-1 lg:gap-6">
           <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden [container-type:size]">
             <CameraView
@@ -679,7 +700,23 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
             />
           </div>
 
-          {/* Non-Intrusive Countdown Overlay (Does not block faces / viewfinder preview) */}
+          {/* Floating Pose Guide Pill on Mobile (Visible before countdown, keeps camera view uncluttered) */}
+          {!allDone && currentPose && countdown === 0 && !armedShot && (
+            <div className="pointer-events-none absolute top-2 inset-x-2 z-20 flex justify-center md:hidden">
+              <div className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1 text-white backdrop-blur-md border border-white/20 shadow-md max-w-[85%] truncate">
+                <span className="shrink-0 text-xs">{currentPose.emoji}</span>
+                <span className="text-[11px] font-bold text-amber-300 truncate">
+                  #{currentPose.id} {currentPose.title}
+                </span>
+                <span className="text-white/30">•</span>
+                <span className="text-[10px] text-white/90 truncate">
+                  {isHost ? currentPose.hostTip : currentPose.guestTip}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Non-Intrusive Countdown Overlay */}
           {cameraReady && (countdown > 0 || (captureMode === "manual" && armedShot && countdown === 0)) && (
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-2.5 sm:p-4 z-20">
               {/* Sleek Top Floating Pill (Above eye/head level) */}
@@ -694,7 +731,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 </span>
               </div>
 
-              {/* Compact Center Countdown Badge (Fits between dual camera columns, leaves faces visible) */}
+              {/* Compact Center Countdown Badge */}
               <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm border border-white/25 shadow-xl">
                 <span
                   key={`${activeIndex}-${countdown}`}
@@ -705,7 +742,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 </span>
               </div>
 
-              {/* Bottom Cue Badge: Specific pose instruction for Host vs Guest */}
+              {/* Bottom Cue Badge */}
               <div className="rounded-full bg-black/65 px-3.5 py-1 text-white backdrop-blur-md border border-white/20 shadow-md max-w-[92%] text-center">
                 <p className="text-[11px] sm:text-xs font-medium text-white/95 truncate">
                   <span className="text-amber-300 font-bold">Tips kamu:</span> {isHost ? currentPose?.hostTip : currentPose?.guestTip}
@@ -719,8 +756,122 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
           )}
         </div>
 
-        {/* Sidebar Filmstrip Console */}
-        <div className="flex shrink-0 flex-col gap-2.5 sm:gap-3 landscape:min-h-0 landscape:w-56 landscape:justify-center landscape:overflow-y-auto md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-76 lg:overflow-visible">
+        {/* Mobile Bottom Bar: Sleek, compact & Camera-First (< md) */}
+        <div className="flex md:hidden shrink-0 flex-col gap-2 pt-0.5 pb-1">
+          {/* Row 1: 4-Slot Mini Filmstrip & Quick Mode / Timer controls */}
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            {/* 4 Mini Thumbnails */}
+            <div className="flex items-center gap-1.5">
+              {[0, 1, 2, 3].map((i) => {
+                const done = shots[i].done;
+                const isActive = i === activeIndex;
+                return (
+                  <div
+                    key={i}
+                    className={`relative h-10 w-8 overflow-hidden rounded-lg border transition-all ${
+                      done
+                        ? "border-emerald-500 ring-1 ring-emerald-500/40"
+                        : isActive
+                          ? "border-booth-accent ring-2 ring-booth-accent/50 scale-105"
+                          : "border-booth-line/60 dark:border-booth-nightline/60 bg-black/20"
+                    }`}
+                  >
+                    {myShots[i] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={myShots[i]!} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-booth-muted dark:text-booth-creamdim">
+                        {isActive ? (
+                          <CameraIcon size={13} className="text-booth-accent animate-pulse" />
+                        ) : (
+                          <span>#{i + 1}</span>
+                        )}
+                      </div>
+                    )}
+                    {done && (
+                      <span className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                        <CheckIcon size={8} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick Mode & Timer Controls */}
+            {isHost && !allDone ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => switchMode(captureMode === "auto" ? "manual" : "auto")}
+                  className="rounded-lg border border-booth-line bg-booth-card/80 px-2 py-1 text-[11px] font-bold text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:bg-booth-nightcard/80 dark:text-booth-cream active:scale-95 cursor-pointer"
+                >
+                  {captureMode === "auto" ? "✨ Auto" : "📸 Manual"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const options = captureMode === "auto" ? [3, 5, 10] : [0, 3, 5, 10];
+                    const nextIdx = (options.indexOf(timerOption) + 1) % options.length;
+                    void switchTimer(options[nextIdx]);
+                  }}
+                  className="rounded-lg border border-booth-line bg-booth-card/80 px-2 py-1 text-[11px] font-bold tabular-nums text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:bg-booth-nightcard/80 dark:text-booth-cream active:scale-95 cursor-pointer"
+                >
+                  ⏱️ {timerOption}s
+                </button>
+              </div>
+            ) : (
+              <div className="text-[11px] font-semibold text-booth-muted dark:text-booth-creamdim">
+                {captureMode === "auto" ? "✨ Auto" : "📸 Manual"} · {timerOption}s
+              </div>
+            )}
+          </div>
+
+          {/* Row 2: Shutter Bar / Finish CTA */}
+          <div className="flex items-center gap-2">
+            {allDone ? (
+              <Btn tone="accent" onClick={finish} disabled={finishing} className="w-full text-sm py-3 font-bold shadow-lg">
+                {finishing ? "Menyusun Foto…" : "Lihat Hasil Foto ✦"}
+              </Btn>
+            ) : captureMode === "manual" ? (
+              isHost ? (
+                armedShot ? (
+                  <button
+                    type="button"
+                    onClick={cancelManualCountdown}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/80 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100 transition active:scale-[0.98] dark:border-red-500/60 dark:bg-red-950/50 dark:text-red-300 cursor-pointer"
+                  >
+                    <span>Batal Hitung Mundur Foto {armedShot.sequence}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={triggerManualShot}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-booth-accent text-sm font-bold text-white shadow-lg hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                  >
+                    <CameraIcon size={18} />
+                    <span>
+                      Jepret Foto {nextUnfinishedIndex + 1} ({timerOption === 0 ? "Instan" : `${timerOption}s`})
+                    </span>
+                  </button>
+                )
+              ) : (
+                <div className="flex h-10 w-full items-center justify-center rounded-xl border border-booth-line/70 bg-black/[0.02] px-3 text-xs text-booth-muted dark:border-booth-nightline/70 dark:text-booth-creamdim">
+                  {armedShot
+                    ? `✦ Bersiap! Foto ${armedShot.sequence} (${countdown}s)…`
+                    : `Menunggu host foto ${nextUnfinishedIndex + 1}…`}
+                </div>
+              )
+            ) : (
+              <div className="flex h-10 w-full items-center justify-center rounded-xl border border-booth-line/70 bg-black/[0.02] px-3 text-xs text-booth-muted dark:border-booth-nightline/70 dark:text-booth-creamdim">
+                Hitung mundur otomatis ({timerOption}s) per foto
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Sidebar Console (md: and up, generous layout) */}
+        <div className="hidden md:flex shrink-0 flex-col gap-2.5 sm:gap-3 md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-76 lg:overflow-visible">
           {/* Couple Pose Guide Card */}
           {!allDone && currentPose && (
             <div className="booth-card rounded-2xl p-2.5 sm:p-3 border-amber-500/30 bg-amber-500/[0.04] dark:bg-amber-500/[0.06]">
@@ -746,6 +897,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
               </div>
             </div>
           )}
+
           {/* Filmstrip Card */}
           <div className="booth-card rounded-2xl p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
@@ -757,7 +909,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-2 landscape:grid-cols-2 md:grid-cols-2 lg:gap-2.5">
+            <div className="grid grid-cols-2 gap-2 lg:gap-2.5">
               {[0, 1, 2, 3].map((i) => {
                 const ar = cam.ratio === "1:1" ? "aspect-square" : cam.ratio === "9:16" ? "aspect-[9/16]" : "aspect-[3/4]";
                 const done = shots[i].done;
@@ -875,18 +1027,6 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Audio Mute Toggle */}
-          {cameraReady && cam.audioOn && (
-            <button
-              type="button"
-              onClick={cam.toggleMute}
-              className="flex min-h-[38px] w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-booth-line bg-booth-card px-3 py-1.5 text-xs font-semibold text-booth-ink hover:bg-black/[0.04] transition active:translate-y-px dark:border-booth-nightline dark:bg-booth-nightcard dark:text-booth-cream cursor-pointer"
-            >
-              {cam.muted ? <MicOffIcon size={15} className="text-red-500" /> : <MicIcon size={15} className="text-emerald-500" />}
-              <span>{cam.muted ? "Mic Bisu (Ketuk Bicara)" : "Mic Aktif"}</span>
-            </button>
           )}
 
           {/* Selesai / Action Console */}

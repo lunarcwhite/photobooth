@@ -339,6 +339,22 @@ export default function SamaPage() {
             message={cam.message}
           />
 
+          {/* Floating Pose Guide Pill on Mobile (Visible before countdown, keeps camera view uncluttered) */}
+          {phase === "running" && currentPose && !isCountingDown && (
+            <div className="pointer-events-none absolute top-2 inset-x-2 z-20 flex justify-center md:hidden">
+              <div className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1 text-white backdrop-blur-md border border-white/20 shadow-md max-w-[85%] truncate">
+                <span className="shrink-0 text-xs">{currentPose.emoji}</span>
+                <span className="text-[11px] font-bold text-amber-300 truncate">
+                  #{currentPose.id} {currentPose.title}
+                </span>
+                <span className="text-white/30">•</span>
+                <span className="text-[10px] text-white/90 truncate">
+                  {currentPose.desc}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Non-Intrusive Countdown Overlay (Does not block faces / viewfinder preview) */}
           {cameraReady && phase === "running" && isCountingDown && (
             <div className="pointer-events-auto absolute inset-0 flex flex-col items-center justify-between p-2.5 sm:p-4 z-20">
@@ -381,8 +397,211 @@ export default function SamaPage() {
           )}
         </div>
 
-        {/* Console & Controls Panel */}
-        <div className="flex shrink-0 flex-col gap-2.5 landscape:min-h-0 landscape:w-56 landscape:justify-center landscape:overflow-y-auto md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-80 lg:overflow-visible">
+        {/* Mobile Bottom Console: Camera-First, Compact (< md) */}
+        <div className="flex md:hidden shrink-0 flex-col gap-2 pt-0.5 pb-1">
+          {phase === "idle" ? (
+            <div className="booth-card rounded-2xl p-3 space-y-2.5">
+              {/* Names input */}
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={name1}
+                  onChange={(e) => setName1(e.target.value)}
+                  placeholder="Nama 1 (Opsional)"
+                  maxLength={15}
+                  aria-label="Nama pertama"
+                  className="w-full rounded-xl border border-booth-line bg-booth-card px-2.5 py-1.5 text-xs font-semibold outline-none placeholder:font-normal placeholder:text-booth-muted/70 focus:border-booth-accent dark:border-booth-nightline dark:bg-booth-nightcard dark:text-booth-cream"
+                />
+                <input
+                  value={name2}
+                  onChange={(e) => setName2(e.target.value)}
+                  placeholder="Nama 2 (Opsional)"
+                  maxLength={15}
+                  aria-label="Nama kedua"
+                  className="w-full rounded-xl border border-booth-line bg-booth-card px-2.5 py-1.5 text-xs font-semibold outline-none placeholder:font-normal placeholder:text-booth-muted/70 focus:border-booth-accent dark:border-booth-nightline dark:bg-booth-nightcard dark:text-booth-cream"
+                />
+              </div>
+
+              {/* Mode & Timer Controls */}
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="inline-flex rounded-lg border border-booth-line bg-black/[0.04] p-0.5 dark:border-booth-nightline dark:bg-white/[0.05]">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("auto")}
+                    className={`rounded-md py-1 px-2 text-[11px] font-semibold transition cursor-pointer ${
+                      captureMode === "auto"
+                        ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
+                        : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                    }`}
+                  >
+                    ✨ Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMode("manual")}
+                    className={`rounded-md py-1 px-2 text-[11px] font-semibold transition cursor-pointer ${
+                      captureMode === "manual"
+                        ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
+                        : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                    }`}
+                  >
+                    📸 Manual
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  {TIMER_OPTIONS.map((t) => {
+                    const isSelected = timerOption === t.val;
+                    const isDisabled = captureMode === "auto" && t.val === 0;
+                    return (
+                      <button
+                        key={t.val}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => changeTimer(t.val)}
+                        className={`rounded-lg py-1 px-1.5 text-[10px] font-bold tabular-nums transition cursor-pointer ${
+                          isSelected
+                            ? "bg-booth-accent text-white shadow-xs"
+                            : isDisabled
+                              ? "opacity-30 cursor-not-allowed text-booth-muted"
+                              : "border border-booth-line/60 text-booth-muted dark:border-booth-nightline/60 dark:text-booth-creamdim"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Btn tone="accent" onClick={start} className="w-full text-sm py-2.5 font-bold shadow-lg">
+                <CameraIcon size={16} />
+                Mulai Sesi Foto
+              </Btn>
+            </div>
+          ) : phase === "done" ? (
+            <div className="flex flex-col gap-2">
+              <Btn tone="accent" onClick={finish} disabled={finishing} className="w-full text-sm py-3 font-bold shadow-lg">
+                {finishing ? "Menyiapkan Hasil…" : "Lihat Hasil Foto ✦"}
+              </Btn>
+              <GhostBtn onClick={resetSession} className="text-xs font-semibold py-1.5">
+                <RefreshIcon size={14} />
+                Ulangi Sesi Foto
+              </GhostBtn>
+            </div>
+          ) : (
+            <>
+              {/* Row 1: Mini Filmstrip & Quick Mode / Timer Controls */}
+              <div className="flex items-center justify-between gap-2 px-0.5">
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2, 3].map((i) => {
+                    const done = Boolean(shots[i]);
+                    const isActive = i === shotIndex && phase === "running";
+                    return (
+                      <div
+                        key={i}
+                        className={`relative h-10 w-8 overflow-hidden rounded-lg border transition-all ${
+                          done
+                            ? "border-emerald-500 ring-1 ring-emerald-500/40"
+                            : isActive
+                              ? "border-booth-accent ring-2 ring-booth-accent/50 scale-105"
+                              : "border-booth-line/60 dark:border-booth-nightline/60 bg-black/20"
+                        }`}
+                      >
+                        {shots[i] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={shots[i]!} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-booth-muted dark:text-booth-creamdim">
+                            {isActive ? (
+                              <CameraIcon size={13} className="text-booth-accent animate-pulse" />
+                            ) : (
+                              <span>#{i + 1}</span>
+                            )}
+                          </div>
+                        )}
+                        {done && (
+                          <span className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                            <CheckIcon size={8} strokeWidth={3} />
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => switchMode(captureMode === "auto" ? "manual" : "auto")}
+                    className="rounded-lg border border-booth-line bg-booth-card/80 px-2 py-1 text-[11px] font-bold text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:bg-booth-nightcard/80 dark:text-booth-cream active:scale-95 cursor-pointer"
+                  >
+                    {captureMode === "auto" ? "✨ Auto" : "📸 Manual"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const options: TimerOption[] = captureMode === "auto" ? [3, 5, 10] : [0, 3, 5, 10];
+                      const nextIdx = (options.indexOf(timerOption) + 1) % options.length;
+                      changeTimer(options[nextIdx]);
+                    }}
+                    className="rounded-lg border border-booth-line bg-booth-card/80 px-2 py-1 text-[11px] font-bold tabular-nums text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:bg-booth-nightcard/80 dark:text-booth-cream active:scale-95 cursor-pointer"
+                  >
+                    ⏱️ {timerOption}s
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Shutter Bar / Status Action */}
+              <div className="flex items-center gap-2">
+                {captureMode === "manual" ? (
+                  isCountingDown ? (
+                    <div className="flex w-full items-center gap-2">
+                      <Btn tone="accent" disabled className="flex-1 text-xs py-2.5 animate-pulse">
+                        <ClockIcon size={15} />
+                        Hitung Mundur… ({count}s)
+                      </Btn>
+                      <button
+                        type="button"
+                        onClick={cancelCountdown}
+                        className="rounded-xl border border-booth-line px-3 py-2 text-xs font-semibold text-booth-muted hover:text-booth-ink dark:border-booth-nightline dark:text-booth-creamdim cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={triggerManualShot}
+                      disabled={isCapturing}
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-booth-accent text-sm font-bold text-white shadow-lg hover:brightness-105 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
+                    >
+                      <CameraIcon size={18} />
+                      <span>
+                        {isCapturing
+                          ? "Mengambil Foto…"
+                          : `Jepret Foto ${shotIndex + 1} (${timerOption === 0 ? "Instan" : `${timerOption}s`})`}
+                      </span>
+                    </button>
+                  )
+                ) : (
+                  <div className="flex h-10 w-full items-center justify-between rounded-xl border border-booth-line/70 bg-black/[0.02] px-3 text-xs text-booth-muted dark:border-booth-nightline/70 dark:text-booth-creamdim">
+                    <span>Otomatis — foto {shotIndex + 1} dalam {count}s…</span>
+                    <button
+                      type="button"
+                      onClick={() => switchMode("manual")}
+                      className="text-[11px] font-bold text-booth-accent hover:underline cursor-pointer"
+                    >
+                      Beralih Manual
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Desktop Sidebar Console & Controls Panel (md: and up) */}
+        <div className="hidden md:flex shrink-0 flex-col gap-2.5 md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-80 lg:overflow-visible">
           {/* Phase: IDLE (Pengaturan sebelum mulai) */}
           {phase === "idle" && (
             <div className="booth-card rounded-2xl p-3.5 sm:p-4 space-y-3">
@@ -454,7 +673,7 @@ export default function SamaPage() {
                           disabled={isDisabled}
                           onClick={() => setTimerOption(t.val)}
                           title={isDisabled ? "0s khusus mode manual" : `${t.label} - ${t.desc}`}
-                          className={`rounded-lg py-1.5 px-1 text-center transition ${
+                          className={`rounded-lg py-1.5 px-1 text-center transition cursor-pointer ${
                             isSelected
                               ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night font-bold"
                               : isDisabled
@@ -505,6 +724,7 @@ export default function SamaPage() {
                       }`}
                     >
                       {shots[i] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={shots[i]!}
                           alt={`Foto ${i + 1}`}
@@ -558,7 +778,7 @@ export default function SamaPage() {
                 <button
                   type="button"
                   onClick={() => switchMode("auto")}
-                  className={`rounded-lg py-1 px-2.5 text-[11px] font-semibold transition ${
+                  className={`rounded-lg py-1 px-2.5 text-[11px] font-semibold transition cursor-pointer ${
                     captureMode === "auto"
                       ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
                       : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
@@ -569,7 +789,7 @@ export default function SamaPage() {
                 <button
                   type="button"
                   onClick={() => switchMode("manual")}
-                  className={`rounded-lg py-1 px-2.5 text-[11px] font-semibold transition ${
+                  className={`rounded-lg py-1 px-2.5 text-[11px] font-semibold transition cursor-pointer ${
                     captureMode === "manual"
                       ? "bg-booth-ink text-booth-paper shadow-sm dark:bg-booth-cream dark:text-booth-night"
                       : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
@@ -589,7 +809,7 @@ export default function SamaPage() {
                       type="button"
                       disabled={isDisabled}
                       onClick={() => changeTimer(t.val)}
-                      className={`rounded-lg py-1 px-2 text-[10px] font-bold tabular-nums transition ${
+                      className={`rounded-lg py-1 px-2 text-[10px] font-bold tabular-nums transition cursor-pointer ${
                         isSelected
                           ? "bg-booth-accent text-white shadow-xs"
                           : isDisabled
@@ -673,7 +893,7 @@ export default function SamaPage() {
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="hidden sm:block text-center text-xs font-medium text-booth-muted hover:text-booth-ink dark:text-booth-creamdim py-1 transition"
+                className="hidden sm:block text-center text-xs font-medium text-booth-muted hover:text-booth-ink dark:text-booth-creamdim py-1 transition cursor-pointer"
               >
                 Kembali ke Beranda
               </button>
@@ -683,7 +903,7 @@ export default function SamaPage() {
               <button
                 type="button"
                 onClick={resetSession}
-                className="text-center text-xs font-semibold text-booth-muted hover:text-booth-ink dark:text-booth-creamdim py-1 transition"
+                className="text-center text-xs font-semibold text-booth-muted hover:text-booth-ink dark:text-booth-creamdim py-1 transition cursor-pointer"
               >
                 Batalkan Sesi Foto
               </button>

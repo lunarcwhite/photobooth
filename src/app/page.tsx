@@ -195,7 +195,7 @@ export default function Landing() {
               <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-6 lg:gap-8">
                 {/* Visual Sample Photostrip (DESIGN §9) */}
                 <div className="relative shrink-0 group perspective-1000 hidden md:block">
-                  <div className="relative rounded-2xl p-2.5 bg-white shadow-print border border-[#E3DEC3] rotate-[-2deg] transition-all duration-300 hover:rotate-0 hover:scale-[1.02] dark:bg-[#1C1814] dark:border-[#382E24]">
+                  <div className="relative rounded-2xl p-2.5 bg-white shadow-print border border-slate-200 rotate-[-2deg] transition-all duration-300 hover:rotate-0 hover:scale-[1.02] dark:bg-slate-900 dark:border-slate-800">
                     {/* Washi tape visual detail */}
                     <div
                       aria-hidden

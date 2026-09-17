@@ -325,7 +325,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
       {/* Main Studio Grid: Left Print Stage & Right Customization Panel */}
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 md:grid md:grid-cols-[1.15fr_0.85fr] md:items-stretch lg:grid-cols-[1.1fr_360px] lg:gap-6 xl:grid-cols-[1.2fr_380px]">
         {/* Photostrip Print Stage */}
-        <div className="booth-card relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl bg-[#EDE8DC]/50 p-2 sm:p-3 md:p-5 dark:bg-black/30 shadow-inner">
+        <div className="booth-card relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl bg-slate-100/70 p-2 sm:p-3 md:p-5 dark:bg-slate-900/50 shadow-inner">
           {composing && !finalUrl ? (
             <div className="flex flex-col items-center gap-2 text-center text-booth-muted">
               <ClockIcon size={20} className="animate-spin text-booth-accent" />
@@ -344,7 +344,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
                   width: "auto",
                   objectFit: "contain",
                 }}
-                className="rounded-xl shadow-print border border-[#E2DDD0] dark:border-[#382E24] select-none cursor-pointer transition-transform duration-200 active:scale-[0.99]"
+                className="rounded-xl shadow-print border border-slate-200 dark:border-slate-800 select-none cursor-pointer transition-transform duration-200 active:scale-[0.99]"
                 onClick={() => setLightboxOpen(true)}
               />
               <button

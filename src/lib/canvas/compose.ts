@@ -28,11 +28,10 @@ function drawCover(
   const dw = img.width * scale;
   const dh = img.height * scale;
   const dx = (w - dw) / 2;
-  // Saat foto vertikal dipotong untuk slot horizontal, pertahankan bagian atas (kepala/wajah)
+  // Pertahankan framing wajah di tengah/atas
   const dy = dh > h ? (h - dh) * cropTopBias : (h - dh) / 2;
   octx.drawImage(img, dx, dy, dw, dh);
   if (style !== "original") {
-    // Gaya via filter canvas: satu pass cover → pass filter ke kanvas kedua.
     const styled = document.createElement("canvas");
     styled.width = off.width;
     styled.height = off.height;
@@ -50,19 +49,26 @@ function drawCover(
   ctx.drawImage(off, x, y, w, h);
 }
 
-function placeholder(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, text = "Foto tidak tersedia") {
-  ctx.fillStyle = "#232323";
+function placeholder(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  text = "Foto tidak tersedia",
+) {
+  ctx.fillStyle = "#f1f5f9";
   ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = "#8a8a8a";
-  const fontSize = Math.max(13, Math.min(Math.round(h * 0.08), Math.round(w * 0.08)));
+  ctx.fillStyle = "#94a3b8";
+  const fontSize = Math.max(12, Math.min(Math.round(h * 0.07), Math.round(w * 0.07)));
   ctx.font = `500 ${fontSize}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, x + w / 2, y + h / 2);
 }
 
-// Final 1080×1920 JPEG q0.9 (§13).
-// Mendukung mode Remote (8 slot) dan mode Solo Satu HP (single 1x4, twin cut, grid2x2).
+// Final photostrip / photo card JPEG q0.9.
+// Ukuran kanvas dinamis (adaptive canvas): kanvas membesar/mengecil mengikuti rasio foto & layout.
 export async function composeFinal(
   tpl: TemplateConfig,
   slots: (string | null)[],
@@ -83,234 +89,78 @@ export async function composeFinal(
   const caption = (opts.caption ?? "").trim().slice(0, 60);
   const isSolo = Boolean(opts.isSolo);
   const soloLayout: SoloLayout = opts.soloLayout ?? "single";
+  const remoteLayout: RemoteLayout = opts.remoteLayout ?? "seamless";
   const ratio: PhotoRatio = opts.ratio ?? "3:4";
 
-  const canvas = document.createElement("canvas");
-  canvas.width = tpl.width;
-  canvas.height = tpl.height;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = tpl.background;
-  ctx.fillRect(0, 0, tpl.width, tpl.height);
-
-  const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
+  let canvasW = 1080;
+  let canvasH = 1920;
 
   // Mode Solo Satu HP: Layout Khusus 4 Foto
   if (isSolo) {
     const rawImages = await Promise.all(slots.slice(0, 4).map((s) => imageFromURL(s ?? "")));
 
-    if (soloLayout === "twin") {
-      // ✂️ LAYOUT STRIP KEMBAR (Twin Strip 2 Lembar untuk Berdua)
-      // Strip Kiri (x: 0..540) & Strip Kanan (x: 540..1080)
-      let slotW: number;
-      const slotH = 355;
-      if (ratio === "1:1") {
-        slotW = 355;
-      } else if (ratio === "9:16") {
-        slotW = 460;
-      } else {
-        // 3:4
-        slotW = 420;
-      }
-      const slotY = [160, 540, 920, 1300];
-      const leftX = Math.round(270 - slotW / 2);
-      const rightX = Math.round(810 - slotW / 2);
-
-      // Judul masing-masing strip
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      ctx.textAlign = "center";
-      ctx.font = `700 36px Georgia, serif`;
-      ctx.fillText(tpl.text.title, 270, 110);
-      ctx.fillText(tpl.text.title, 810, 110);
-
-      // Gambar 4 foto pada Strip Kiri dan Strip Kanan (masing-masing dapat set lengkap)
-      for (let i = 0; i < 4; i++) {
-        const img = rawImages[i];
-        const y = slotY[i];
-        // Strip Kiri
-        if (img) drawCover(ctx, img, leftX, y, slotW, slotH, style, 0.28);
-        else placeholder(ctx, leftX, y, slotW, slotH);
-        // Strip Kanan
-        if (img) drawCover(ctx, img, rightX, y, slotW, slotH, style, 0.28);
-        else placeholder(ctx, rightX, y, slotW, slotH);
-      }
-
-      // Garis potong putus-putus di tengah
-      ctx.save();
-      ctx.strokeStyle = dark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.22)";
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([14, 12]);
-      ctx.beginPath();
-      ctx.moveTo(540, 70);
-      ctx.lineTo(540, 1850);
-      ctx.stroke();
-
-      // Ikon gunting penanda potong
-      ctx.fillStyle = tpl.background;
-      ctx.fillRect(510, 930, 60, 60);
-      ctx.fillStyle = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)";
-      ctx.font = "400 24px serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("✂", 540, 960);
-      ctx.restore();
-
-      // Hiasan
-      if (decor === "tape") {
-        ctx.save();
-        ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
-        ctx.fillRect(270 - 70, 125, 140, 32);
-        ctx.fillRect(810 - 70, 125, 140, 32);
-        ctx.restore();
-      } else if (decor === "sparkle") {
-        ctx.save();
-        ctx.fillStyle = dark ? "#FFD9A0" : "#C93A2E";
-        ctx.font = "400 28px serif";
-        ctx.fillText("✦", 270 - 180, 110);
-        ctx.fillText("✦", 270 + 180, 110);
-        ctx.fillText("✦", 810 - 180, 110);
-        ctx.fillText("✦", 810 + 180, 110);
-        ctx.restore();
-      }
-
-      // Footer Strip Kiri
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      if (tpl.text.showNames) {
-        ctx.font = "600 30px Georgia, serif";
-        ctx.fillText(opts.names, 270, 1715);
-      }
-      if (tpl.text.showDate) {
-        ctx.font = "400 24px Georgia, serif";
-        ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, 270, 1765);
-      }
-      if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 24px Georgia, serif";
-        ctx.fillText(caption, 270, 1815);
-      }
-
-      // Footer Strip Kanan
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      if (tpl.text.showNames) {
-        ctx.font = "600 30px Georgia, serif";
-        ctx.fillText(opts.names, 810, 1715);
-      }
-      if (tpl.text.showDate) {
-        ctx.font = "400 24px Georgia, serif";
-        ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, 810, 1765);
-      }
-      if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 24px Georgia, serif";
-        ctx.fillText(caption, 810, 1815);
-      }
-    } else if (soloLayout === "grid2x2") {
-      // 🖼️ LAYOUT GRID 2x2 (Kotak 4 Foto ala Polaroid Poster)
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      ctx.textAlign = "center";
-      ctx.font = `700 52px Georgia, serif`;
-      ctx.fillText(tpl.text.title, tpl.width / 2, 115);
-
+    if (soloLayout === "single") {
+      // 🎞️ STRIP 1x4 (Strip Vertikal 4 Foto - Format Photostrip Bookmark Sejati)
       let slotW: number;
       let slotH: number;
-      let x1: number;
-      let x2: number;
-      let y1: number;
-      let y2: number;
+      let slotY: number[];
+      let footerNamesY: number;
+      let footerDateY: number;
+      let footerCaptionY: number;
 
       if (ratio === "1:1") {
-        slotW = 460;
-        slotH = 460;
-        x1 = 55;
-        x2 = 565;
-        y1 = 230;
-        y2 = 730;
+        // Kotak Persegi 1:1: Kartu photostrip ramping dengan 4 kotak murni
+        slotW = 500;
+        slotH = 500;
+        canvasW = 600;
+        slotY = [135, 665, 1195, 1725];
+        footerNamesY = 2290;
+        footerDateY = 2335;
+        footerCaptionY = 2380;
+        canvasH = 2430;
       } else if (ratio === "9:16") {
-        slotH = 640;
-        slotW = Math.round(slotH * (9 / 16));
-        x1 = Math.round((tpl.width - (slotW * 2 + 50)) / 2);
-        x2 = x1 + slotW + 50;
-        y1 = 160;
-        y2 = y1 + slotH + 25;
+        // Vertikal Penuh 9:16: Kartu bookmark elegan untuk foto vertikal HP
+        slotW = 380;
+        slotH = 675; // 380 / 675 = 9 / 16
+        canvasW = 460;
+        slotY = [130, 835, 1540, 2245];
+        footerNamesY = 2980;
+        footerDateY = 3020;
+        footerCaptionY = 3060;
+        canvasH = 3100;
       } else {
-        // 3:4
-        slotH = 580;
-        slotW = Math.round(slotH * 0.75);
-        x1 = Math.round((tpl.width - (slotW * 2 + 50)) / 2);
-        x2 = x1 + slotW + 50;
-        y1 = 180;
-        y2 = y1 + slotH + 25;
+        // 3:4 Potret Klasik: Strip klasik photobooth 3:4 murni
+        slotW = 450;
+        slotH = 600; // 450 / 600 = 3 / 4
+        canvasW = 540;
+        slotY = [135, 765, 1395, 2025];
+        footerNamesY = 2690;
+        footerDateY = 2732;
+        footerCaptionY = 2775;
+        canvasH = 2820;
       }
 
-      const gridCoords = [
-        { x: x1, y: y1 },
-        { x: x2, y: y1 },
-        { x: x1, y: y2 },
-        { x: x2, y: y2 },
-      ];
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
 
-      for (let i = 0; i < 4; i++) {
-        const img = rawImages[i];
-        const coord = gridCoords[i];
-        if (img) drawCover(ctx, img, coord.x, coord.y, slotW, slotH, style);
-        else placeholder(ctx, coord.x, coord.y, slotW, slotH);
-      }
-
-      if (decor === "tape") {
-        ctx.save();
-        ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
-        ctx.fillRect(tpl.width / 2 - 90, 135, 180, 40);
-        ctx.restore();
-      } else if (decor === "sparkle") {
-        ctx.save();
-        ctx.fillStyle = dark ? "#FFD9A0" : "#C93A2E";
-        ctx.font = "400 40px serif";
-        ctx.fillText("✦", tpl.width / 2 - 250, 115);
-        ctx.fillText("✦", tpl.width / 2 + 250, 115);
-        ctx.restore();
-      }
-
-      // Footer Polaroid
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      if (tpl.text.showNames) {
-        ctx.font = "600 48px Georgia, serif";
-        ctx.fillText(opts.names, tpl.width / 2, 1530);
-      }
-      if (tpl.text.showDate) {
-        ctx.font = "400 34px Georgia, serif";
-        ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, tpl.width / 2, 1600);
-      }
-      if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 36px Georgia, serif";
-        ctx.fillText(caption, tpl.width / 2, 1675);
-      }
-    } else {
-      // 🎞️ LAYOUT STRIP TUNGGAL 1x4 (Strip Vertikal Klasik Asli)
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
+      // Header Judul
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
       ctx.textAlign = "center";
-      ctx.font = `700 52px Georgia, serif`;
-      ctx.fillText(tpl.text.title, tpl.width / 2, 115);
+      const titleFont =
+        tpl.id === "minimal"
+          ? `400 ${Math.round(canvasW * 0.055)}px sans-serif`
+          : tpl.id === "retro"
+            ? `700 ${Math.round(canvasW * 0.058)}px "Courier New", monospace`
+            : `700 ${Math.round(canvasW * 0.062)}px Georgia, serif`;
+      ctx.font = titleFont;
+      ctx.fillText(tpl.text.title, canvasW / 2, 85);
 
-      let slotW: number;
-      let slotH = 365;
-      let slotY = [160, 545, 930, 1315];
-
-      if (ratio === "1:1") {
-        slotW = 365;
-        slotH = 365;
-      } else if (ratio === "9:16") {
-        slotW = 760;
-        slotH = 360;
-        slotY = [160, 545, 930, 1315];
-      } else {
-        // 3:4
-        slotW = 540;
-        slotH = 365;
-      }
-      const slotX = Math.round((tpl.width - slotW) / 2);
+      const slotX = Math.round((canvasW - slotW) / 2);
 
       for (let i = 0; i < 4; i++) {
         const img = rawImages[i];
@@ -324,75 +174,350 @@ export async function composeFinal(
         ctx.restore();
 
         ctx.save();
-        ctx.strokeStyle = dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = dark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)";
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.roundRect(slotX, y, slotW, slotH, 16);
         ctx.stroke();
         ctx.restore();
       }
 
+      // Hiasan khusus strip 1x4
       if (decor === "tape") {
         ctx.save();
         ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
-        ctx.fillRect(tpl.width / 2 - 90, 135, 180, 40);
+        ctx.fillRect(canvasW / 2 - 60, 110, 120, 26);
         ctx.restore();
       } else if (decor === "sparkle") {
         ctx.save();
-        ctx.fillStyle = dark ? "#FFD9A0" : "#C93A2E";
-        ctx.font = "400 40px serif";
-        ctx.fillText("✦", tpl.width / 2 - 250, 115);
-        ctx.fillText("✦", tpl.width / 2 + 250, 115);
+        ctx.fillStyle = dark ? "#FFD9A0" : "#ff432a";
+        ctx.font = "400 32px serif";
+        ctx.fillText("✦", canvasW / 2 - slotW / 2 + 10, 85);
+        ctx.fillText("✦", canvasW / 2 + slotW / 2 - 10, 85);
         ctx.restore();
       }
 
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
+      // Footer
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
       if (tpl.text.showNames) {
-        ctx.font = "600 44px Georgia, serif";
-        ctx.fillText(opts.names, tpl.width / 2, 1755);
+        ctx.font = `600 ${Math.round(canvasW * 0.052)}px Georgia, serif`;
+        ctx.fillText(opts.names, canvasW / 2, footerNamesY);
       }
       if (tpl.text.showDate) {
-        ctx.font = "400 32px Georgia, serif";
-        ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, tpl.width / 2, 1815);
+        ctx.font = `400 ${Math.round(canvasW * 0.038)}px Georgia, serif`;
+        ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+        ctx.fillText(opts.date, canvasW / 2, footerDateY);
       }
       if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 32px Georgia, serif";
-        ctx.fillText(caption, tpl.width / 2, 1870);
+        ctx.fillStyle = dark ? "#cbd5e1" : "#475569";
+        ctx.font = `italic 400 ${Math.round(canvasW * 0.038)}px Georgia, serif`;
+        ctx.fillText(caption, canvasW / 2, footerCaptionY);
       }
+
+      renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
+      renderGrain(ctx, canvasW, canvasH, tpl.grain);
+
+      return canvasToBlob(canvas);
+    } else if (soloLayout === "grid2x2") {
+      // 🖼️ LAYOUT GRID 2x2 (Poster Polaroid Kotak Modern)
+      canvasW = 1080;
+      let slotW: number;
+      let slotH: number;
+      let x1: number;
+      let x2: number;
+      let y1: number;
+      let y2: number;
+      let footerNamesY: number;
+      let footerDateY: number;
+      let footerCaptionY: number;
+
+      if (ratio === "1:1") {
+        // Polaroid Feed 1080x1330
+        slotW = 470;
+        slotH = 470;
+        x1 = 55;
+        x2 = 555;
+        y1 = 145;
+        y2 = 645;
+        footerNamesY = 1175;
+        footerDateY = 1230;
+        footerCaptionY = 1280;
+        canvasH = 1330;
+      } else if (ratio === "9:16") {
+        slotW = 430;
+        slotH = 764; // 9:16
+        x1 = 85;
+        x2 = 565;
+        y1 = 145;
+        y2 = 939;
+        footerNamesY = 1765;
+        footerDateY = 1820;
+        footerCaptionY = 1870;
+        canvasH = 1920;
+      } else {
+        // 3:4
+        slotW = 450;
+        slotH = 600;
+        x1 = 65;
+        x2 = 565;
+        y1 = 145;
+        y2 = 775;
+        footerNamesY = 1435;
+        footerDateY = 1490;
+        footerCaptionY = 1540;
+        canvasH = 1590;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
+
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      ctx.textAlign = "center";
+      ctx.font = `700 50px Georgia, serif`;
+      ctx.fillText(tpl.text.title, canvasW / 2, 95);
+
+      const gridCoords = [
+        { x: x1, y: y1 },
+        { x: x2, y: y1 },
+        { x: x1, y: y2 },
+        { x: x2, y: y2 },
+      ];
+
+      for (let i = 0; i < 4; i++) {
+        const img = rawImages[i];
+        const coord = gridCoords[i];
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(coord.x, coord.y, slotW, slotH, 16);
+        ctx.clip();
+        if (img) drawCover(ctx, img, coord.x, coord.y, slotW, slotH, style, 0.28);
+        else placeholder(ctx, coord.x, coord.y, slotW, slotH);
+        ctx.restore();
+
+        ctx.save();
+        ctx.strokeStyle = dark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(coord.x, coord.y, slotW, slotH, 16);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Footer
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      if (tpl.text.showNames) {
+        ctx.font = "600 44px Georgia, serif";
+        ctx.fillText(opts.names, canvasW / 2, footerNamesY);
+      }
+      if (tpl.text.showDate) {
+        ctx.font = "400 30px Georgia, serif";
+        ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+        ctx.fillText(opts.date, canvasW / 2, footerDateY);
+      }
+      if (caption) {
+        ctx.fillStyle = dark ? "#cbd5e1" : "#475569";
+        ctx.font = "italic 400 30px Georgia, serif";
+        ctx.fillText(caption, canvasW / 2, footerCaptionY);
+      }
+
+      renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
+      renderGrain(ctx, canvasW, canvasH, tpl.grain);
+
+      return canvasToBlob(canvas);
+    } else {
+      // ✂️ LAYOUT STRIP KEMBAR (Twin Strip 2 Lembar untuk Berdua)
+      canvasW = 1080;
+      let slotW: number;
+      let slotH: number;
+      let slotY: number[];
+      let leftX: number;
+      let rightX: number;
+      let footerNamesY: number;
+      let footerDateY: number;
+      let footerCaptionY: number;
+
+      if (ratio === "1:1") {
+        slotW = 400;
+        slotH = 400;
+        leftX = 70;
+        rightX = 610;
+        slotY = [140, 565, 990, 1415];
+        footerNamesY = 1875;
+        footerDateY = 1920;
+        footerCaptionY = 1965;
+        canvasH = 2010;
+      } else if (ratio === "9:16") {
+        slotW = 360;
+        slotH = 640;
+        leftX = 90;
+        rightX = 630;
+        slotY = [140, 805, 1470, 2135];
+        footerNamesY = 2835;
+        footerDateY = 2880;
+        footerCaptionY = 2925;
+        canvasH = 2970;
+      } else {
+        // 3:4
+        slotW = 390;
+        slotH = 520;
+        leftX = 75;
+        rightX = 615;
+        slotY = [140, 685, 1230, 1775];
+        footerNamesY = 2355;
+        footerDateY = 2400;
+        footerCaptionY = 2445;
+        canvasH = 2490;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
+
+      // Judul masing-masing strip
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      ctx.textAlign = "center";
+      ctx.font = `700 36px Georgia, serif`;
+      ctx.fillText(tpl.text.title, 270, 95);
+      ctx.fillText(tpl.text.title, 810, 95);
+
+      for (let i = 0; i < 4; i++) {
+        const img = rawImages[i];
+        const y = slotY[i];
+
+        // Strip Kiri
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(leftX, y, slotW, slotH, 14);
+        ctx.clip();
+        if (img) drawCover(ctx, img, leftX, y, slotW, slotH, style, 0.28);
+        else placeholder(ctx, leftX, y, slotW, slotH);
+        ctx.restore();
+
+        // Strip Kanan
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(rightX, y, slotW, slotH, 14);
+        ctx.clip();
+        if (img) drawCover(ctx, img, rightX, y, slotW, slotH, style, 0.28);
+        else placeholder(ctx, rightX, y, slotW, slotH);
+        ctx.restore();
+      }
+
+      // Garis potong putus-putus di tengah
+      ctx.save();
+      ctx.strokeStyle = dark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([14, 12]);
+      ctx.beginPath();
+      ctx.moveTo(540, 50);
+      ctx.lineTo(540, canvasH - 50);
+      ctx.stroke();
+
+      // Ikon gunting penanda potong
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(510, canvasH / 2 - 30, 60, 60);
+      ctx.fillStyle = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)";
+      ctx.font = "400 24px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("✂", 540, canvasH / 2);
+      ctx.restore();
+
+      // Footer Strip Kiri & Kanan
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      if (tpl.text.showNames) {
+        ctx.font = "600 28px Georgia, serif";
+        ctx.fillText(opts.names, 270, footerNamesY);
+        ctx.fillText(opts.names, 810, footerNamesY);
+      }
+      if (tpl.text.showDate) {
+        ctx.font = "400 22px Georgia, serif";
+        ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+        ctx.fillText(opts.date, 270, footerDateY);
+        ctx.fillText(opts.date, 810, footerDateY);
+      }
+      if (caption) {
+        ctx.fillStyle = dark ? "#cbd5e1" : "#475569";
+        ctx.font = "italic 400 22px Georgia, serif";
+        ctx.fillText(caption, 270, footerCaptionY);
+        ctx.fillText(caption, 810, footerCaptionY);
+      }
+
+      renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
+      renderGrain(ctx, canvasW, canvasH, tpl.grain);
+
+      return canvasToBlob(canvas);
     }
   } else {
-    // Mode Remote 2 HP Berjauhan: Mendukung Seamless Duo (Bilik Bersatu), Twin, dan Split Klasik
-    const remoteLayout: RemoteLayout = opts.remoteLayout ?? "seamless";
+    // Mode Remote 2 HP Berjauhan
+    const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
 
     if (remoteLayout === "seamless") {
       // ✨ LAYOUT BILIK BERSATU (Seamless Duo - 4 frame lebar menyatu tanpa sekat pemisah)
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      ctx.textAlign = "center";
-      ctx.font = `700 54px Georgia, serif`;
-      ctx.fillText(tpl.text.title, tpl.width / 2, 105);
-
-      const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
-
-      // 4 Baris Horizontal Lebar yang menyatukan kedua orang (proporsional memenuhi frame sesuai rasio)
       let halfW: number;
-      let rowH = 360;
+      let rowH: number;
+      let rowY: number[];
+      let footerNamesY: number;
+      let footerDateY: number;
+      let footerCaptionY: number;
+
       if (ratio === "1:1") {
-        halfW = 360;
-        rowH = 360;
+        // Host 440x440 kotak, Guest 440x440 kotak -> 880x440 per baris
+        halfW = 440;
+        rowH = 440;
+        canvasW = 980;
+        rowY = [135, 600, 1065, 1530];
+        footerNamesY = 2030;
+        footerDateY = 2080;
+        footerCaptionY = 2130;
+        canvasH = 2180;
       } else if (ratio === "9:16") {
-        halfW = 480;
-        rowH = 355;
+        // Host 360x640, Guest 360x640 -> 720x640 per baris
+        halfW = 360;
+        rowH = 640;
+        canvasW = 840;
+        rowY = [135, 800, 1465, 2130];
+        footerNamesY = 2835;
+        footerDateY = 2885;
+        footerCaptionY = 2935;
+        canvasH = 2985;
       } else {
         // 3:4
-        halfW = 440;
-        rowH = 360;
+        halfW = 400;
+        rowH = 533;
+        canvasW = 920;
+        rowY = [135, 693, 1251, 1809];
+        footerNamesY = 2405;
+        footerDateY = 2455;
+        footerCaptionY = 2505;
+        canvasH = 2555;
       }
+
       const rowW = halfW * 2;
-      const startX = Math.round((tpl.width - rowW) / 2);
-      const rowY = [160, 545, 930, 1315];
+      const startX = Math.round((canvasW - rowW) / 2);
       const cornerR = 20;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
+
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      ctx.textAlign = "center";
+      ctx.font = `700 48px Georgia, serif`;
+      ctx.fillText(tpl.text.title, canvasW / 2, 85);
 
       for (let r = 0; r < 4; r++) {
         const y = rowY[r];
@@ -400,7 +525,6 @@ export async function composeFinal(
         const guestImg = images[r * 2 + 1];
 
         ctx.save();
-        // Clip rounded corner untuk satu frame baris utuh
         ctx.beginPath();
         ctx.roundRect(startX, y, rowW, rowH, cornerR);
         ctx.clip();
@@ -409,12 +533,12 @@ export async function composeFinal(
         if (hostImg) drawCover(ctx, hostImg, startX, y, halfW, rowH, style, 0.28);
         else placeholder(ctx, startX, y, halfW, rowH);
 
-        // Guest (kanan) - menyatu rapat di tengah!
+        // Guest (kanan)
         if (guestImg) drawCover(ctx, guestImg, startX + halfW, y, halfW, rowH, style, 0.28);
         else placeholder(ctx, startX + halfW, y, halfW, rowH);
 
-        // Garis batas sambungan tengah yang halus
-        ctx.strokeStyle = dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
+        // Garis pemisah tengah halus
+        ctx.strokeStyle = dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.1)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(startX + halfW, y);
@@ -423,10 +547,10 @@ export async function composeFinal(
 
         ctx.restore();
 
-        // Outer border halus
+        // Outer border
         ctx.save();
-        ctx.strokeStyle = dark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.12)";
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = dark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)";
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.roundRect(startX, y, rowW, rowH, cornerR);
         ctx.stroke();
@@ -434,207 +558,322 @@ export async function composeFinal(
       }
 
       // Footer
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
       if (tpl.text.showNames) {
-        ctx.font = "600 44px Georgia, serif";
-        ctx.fillText(opts.names, tpl.width / 2, 1745);
+        ctx.font = `600 ${Math.round(canvasW * 0.046)}px Georgia, serif`;
+        ctx.fillText(opts.names, canvasW / 2, footerNamesY);
       }
       if (tpl.text.showDate) {
-        ctx.font = "400 32px Georgia, serif";
-        ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, tpl.width / 2, 1805);
+        ctx.font = `400 ${Math.round(canvasW * 0.034)}px Georgia, serif`;
+        ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+        ctx.fillText(opts.date, canvasW / 2, footerDateY);
       }
       if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 32px Georgia, serif";
-        ctx.fillText(caption, tpl.width / 2, 1860);
+        ctx.fillStyle = dark ? "#cbd5e1" : "#475569";
+        ctx.font = `italic 400 ${Math.round(canvasW * 0.034)}px Georgia, serif`;
+        ctx.fillText(caption, canvasW / 2, footerCaptionY);
       }
+
+      renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
+      renderGrain(ctx, canvasW, canvasH, tpl.grain);
+
+      return canvasToBlob(canvas);
     } else if (remoteLayout === "twin") {
       // ✂️ STRIP KEMBAR DUO (Strip Host di Kiri, Strip Guest di Kanan)
+      canvasW = 1080;
       let slotW: number;
-      const slotH = 355;
+      let slotH: number;
+      let slotY: number[];
+      let leftX: number;
+      let rightX: number;
+      let footerNamesY: number;
+      let footerDateY: number;
+      let footerCaptionY: number;
+
       if (ratio === "1:1") {
-        slotW = 355;
+        slotW = 400;
+        slotH = 400;
+        leftX = 70;
+        rightX = 610;
+        slotY = [140, 565, 990, 1415];
+        footerNamesY = 1875;
+        footerDateY = 1920;
+        footerCaptionY = 1965;
+        canvasH = 2010;
       } else if (ratio === "9:16") {
-        slotW = 460;
+        slotW = 360;
+        slotH = 640;
+        leftX = 90;
+        rightX = 630;
+        slotY = [140, 805, 1470, 2135];
+        footerNamesY = 2835;
+        footerDateY = 2880;
+        footerCaptionY = 2925;
+        canvasH = 2970;
       } else {
         // 3:4
-        slotW = 420;
+        slotW = 390;
+        slotH = 520;
+        leftX = 75;
+        rightX = 615;
+        slotY = [140, 685, 1230, 1775];
+        footerNamesY = 2355;
+        footerDateY = 2400;
+        footerCaptionY = 2445;
+        canvasH = 2490;
       }
-      const slotY = [160, 540, 920, 1300];
-      const leftX = Math.round(270 - slotW / 2);
-      const rightX = Math.round(810 - slotW / 2);
 
-      const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
 
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
       ctx.textAlign = "center";
       ctx.font = `700 36px Georgia, serif`;
-      ctx.fillText(tpl.text.title, 270, 110);
-      ctx.fillText(tpl.text.title, 810, 110);
+      ctx.fillText(tpl.text.title, 270, 95);
+      ctx.fillText(tpl.text.title, 810, 95);
 
       for (let i = 0; i < 4; i++) {
         const hostImg = images[i * 2];
         const guestImg = images[i * 2 + 1];
         const y = slotY[i];
 
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(leftX, y, slotW, slotH, 14);
+        ctx.clip();
         if (hostImg) drawCover(ctx, hostImg, leftX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, leftX, y, slotW, slotH);
+        ctx.restore();
 
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(rightX, y, slotW, slotH, 14);
+        ctx.clip();
         if (guestImg) drawCover(ctx, guestImg, rightX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, rightX, y, slotW, slotH);
+        ctx.restore();
       }
 
+      // Garis potong tengah
       ctx.save();
-      ctx.strokeStyle = dark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.22)";
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = dark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)";
+      ctx.lineWidth = 2;
       ctx.setLineDash([14, 12]);
       ctx.beginPath();
-      ctx.moveTo(540, 70);
-      ctx.lineTo(540, 1850);
+      ctx.moveTo(540, 50);
+      ctx.lineTo(540, canvasH - 50);
       ctx.stroke();
 
       ctx.fillStyle = tpl.background;
-      ctx.fillRect(510, 930, 60, 60);
+      ctx.fillRect(510, canvasH / 2 - 30, 60, 60);
       ctx.fillStyle = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)";
       ctx.font = "400 24px serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("✂", 540, 960);
+      ctx.fillText("✂", 540, canvasH / 2);
       ctx.restore();
 
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
       const nameParts = opts.names.split("&").map((s) => s.trim());
       const hostName = nameParts[0] || opts.names;
       const guestName = nameParts[1] || nameParts[0] || opts.names;
 
-      ctx.font = "600 36px Georgia, serif";
-      ctx.fillText(hostName, 270, 1710);
-      ctx.fillText(guestName, 810, 1710);
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      ctx.font = "600 32px Georgia, serif";
+      ctx.fillText(hostName, 270, footerNamesY);
+      ctx.fillText(guestName, 810, footerNamesY);
 
-      ctx.font = "400 26px Georgia, serif";
-      ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-      ctx.fillText(opts.date, 270, 1765);
-      ctx.fillText(opts.date, 810, 1765);
+      ctx.font = "400 22px Georgia, serif";
+      ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+      ctx.fillText(opts.date, 270, footerDateY);
+      ctx.fillText(opts.date, 810, footerDateY);
 
       if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 26px Georgia, serif";
-        ctx.fillText(caption, 270, 1820);
-        ctx.fillText(caption, 810, 1820);
+        ctx.fillStyle = dark ? "#cbd5e1" : "#475569";
+        ctx.font = "italic 400 22px Georgia, serif";
+        ctx.fillText(caption, 270, footerCaptionY);
+        ctx.fillText(caption, 810, footerCaptionY);
       }
+
+      renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
+      renderGrain(ctx, canvasW, canvasH, tpl.grain);
+
+      return canvasToBlob(canvas);
     } else {
       // 🪟 GRID KLASIK (8 Slot Berdampingan)
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
-      ctx.textAlign = "center";
-      ctx.font = `700 54px Georgia, serif`;
-      ctx.fillText(tpl.text.title, tpl.width / 2, 100);
-
       let slotW: number;
-      const slotH = 360;
+      let slotH: number;
       let col1X: number;
       let col2X: number;
+      let rowY: number[];
+      let footerNamesY: number;
+      let footerDateY: number;
+      let footerCaptionY: number;
+
       if (ratio === "1:1") {
-        slotW = 360;
-        col1X = 140;
-        col2X = 580;
+        slotW = 400;
+        slotH = 400;
+        canvasW = 920;
+        col1X = 40;
+        col2X = 480;
+        rowY = [135, 560, 985, 1410];
+        footerNamesY = 1875;
+        footerDateY = 1925;
+        footerCaptionY = 1970;
+        canvasH = 2020;
       } else if (ratio === "9:16") {
-        slotW = 470;
+        slotW = 360;
+        slotH = 640;
+        canvasW = 840;
         col1X = 45;
-        col2X = 565;
+        col2X = 435;
+        rowY = [135, 800, 1465, 2130];
+        footerNamesY = 2835;
+        footerDateY = 2885;
+        footerCaptionY = 2935;
+        canvasH = 2980;
       } else {
         // 3:4
-        slotW = 440;
-        col1X = 70;
-        col2X = 570;
+        slotW = 390;
+        slotH = 520;
+        canvasW = 900;
+        col1X = 45;
+        col2X = 465;
+        rowY = [135, 680, 1225, 1770];
+        footerNamesY = 2355;
+        footerDateY = 2405;
+        footerCaptionY = 2450;
+        canvasH = 2500;
       }
-      const rowY = [160, 545, 930, 1315];
 
-      const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = tpl.background;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      const dark = tpl.background.toLowerCase() === "#111111" || tpl.background.toLowerCase() === "#000000";
+
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
+      ctx.textAlign = "center";
+      ctx.font = `700 48px Georgia, serif`;
+      ctx.fillText(tpl.text.title, canvasW / 2, 85);
+
       for (let i = 0; i < 8; i++) {
         const img = images[i];
         const rowIdx = Math.floor(i / 2);
         const isCol2 = i % 2 === 1;
         const x = isCol2 ? col2X : col1X;
         const y = rowY[rowIdx];
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, slotW, slotH, 14);
+        ctx.clip();
         if (img) drawCover(ctx, img, x, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, x, y, slotW, slotH);
+        ctx.restore();
       }
 
-      ctx.fillStyle = dark ? "#ffffff" : "#111111";
+      ctx.fillStyle = dark ? "#ffffff" : "#0f172a";
       if (tpl.text.showNames) {
-        ctx.font = "600 44px Georgia, serif";
-        ctx.fillText(opts.names, tpl.width / 2, 1745);
+        ctx.font = `600 ${Math.round(canvasW * 0.046)}px Georgia, serif`;
+        ctx.fillText(opts.names, canvasW / 2, footerNamesY);
       }
       if (tpl.text.showDate) {
-        ctx.font = "400 32px Georgia, serif";
-        ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, tpl.width / 2, 1805);
+        ctx.font = `400 ${Math.round(canvasW * 0.034)}px Georgia, serif`;
+        ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+        ctx.fillText(opts.date, canvasW / 2, footerDateY);
       }
       if (caption) {
-        ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 32px Georgia, serif";
-        ctx.fillText(caption, tpl.width / 2, 1860);
+        ctx.fillStyle = dark ? "#cbd5e1" : "#475569";
+        ctx.font = `italic 400 ${Math.round(canvasW * 0.034)}px Georgia, serif`;
+        ctx.fillText(caption, canvasW / 2, footerCaptionY);
       }
+
+      renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
+      renderGrain(ctx, canvasW, canvasH, tpl.grain);
+
+      return canvasToBlob(canvas);
     }
   }
+}
 
-  // Hiasan & Stiker untuk semua layout (Solo & Remote)
-  if (decor !== "none") {
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+function renderGlobalDecor(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  decor: PhotoDecor,
+  dark: boolean,
+) {
+  if (decor === "none") return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
-    if (decor === "ribbon") {
-      ctx.font = "46px sans-serif";
-      ctx.fillText("🎀", 95, 95);
-      ctx.fillText("🎀", tpl.width - 95, 95);
-      ctx.font = "38px sans-serif";
-      ctx.fillText("🎀", 80, tpl.height - 110);
-      ctx.fillText("🎀", tpl.width - 80, tpl.height - 110);
-    } else if (decor === "hearts") {
-      ctx.font = "42px sans-serif";
-      ctx.fillText("💖", 95, 95);
-      ctx.fillText("💕", tpl.width - 95, 95);
-      ctx.font = "36px sans-serif";
-      ctx.fillText("💗", 75, tpl.height - 110);
-      ctx.fillText("💗", tpl.width - 75, tpl.height - 110);
-    } else if (decor === "cats") {
-      ctx.font = "38px sans-serif";
-      ctx.fillText("🐾", 95, 95);
-      ctx.fillText("🐾", tpl.width - 95, 95);
-      ctx.font = "34px sans-serif";
-      ctx.fillText("🐾", 75, tpl.height - 105);
-      ctx.fillText("🐾", tpl.width - 75, tpl.height - 105);
-    } else if (decor === "sparkle") {
-      ctx.fillStyle = dark ? "#FFD9A0" : "#C93A2E";
-      ctx.font = "42px serif";
-      ctx.fillText("✦", 95, 95);
-      ctx.fillText("✦", tpl.width - 95, 95);
-      ctx.font = "36px sans-serif";
-      ctx.fillText("✨", 80, tpl.height - 110);
-      ctx.fillText("✨", tpl.width - 80, tpl.height - 110);
-    } else if (decor === "tape") {
-      ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
-      ctx.fillRect(tpl.width / 2 - 90, 30, 180, 40);
-    }
-    ctx.restore();
+  const cornerOffset = Math.max(35, Math.round(w * 0.07));
+
+  if (decor === "ribbon") {
+    ctx.font = `${Math.round(w * 0.06)}px sans-serif`;
+    ctx.fillText("🎀", cornerOffset, cornerOffset);
+    ctx.fillText("🎀", w - cornerOffset, cornerOffset);
+    ctx.fillText("🎀", cornerOffset, h - cornerOffset);
+    ctx.fillText("🎀", w - cornerOffset, h - cornerOffset);
+  } else if (decor === "hearts") {
+    ctx.font = `${Math.round(w * 0.055)}px sans-serif`;
+    ctx.fillText("💖", cornerOffset, cornerOffset);
+    ctx.fillText("💕", w - cornerOffset, cornerOffset);
+    ctx.fillText("💗", cornerOffset, h - cornerOffset);
+    ctx.fillText("💗", w - cornerOffset, h - cornerOffset);
+  } else if (decor === "cats") {
+    ctx.font = `${Math.round(w * 0.055)}px sans-serif`;
+    ctx.fillText("🐾", cornerOffset, cornerOffset);
+    ctx.fillText("🐾", w - cornerOffset, cornerOffset);
+    ctx.fillText("🐾", cornerOffset, h - cornerOffset);
+    ctx.fillText("🐾", w - cornerOffset, h - cornerOffset);
+  } else if (decor === "sparkle") {
+    ctx.fillStyle = dark ? "#FFD9A0" : "#ff432a";
+    ctx.font = `${Math.round(w * 0.06)}px serif`;
+    ctx.fillText("✦", cornerOffset, cornerOffset);
+    ctx.fillText("✦", w - cornerOffset, cornerOffset);
+    ctx.fillText("✨", cornerOffset, h - cornerOffset);
+    ctx.fillText("✨", w - cornerOffset, h - cornerOffset);
+  } else if (decor === "tape") {
+    ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
+    const tapeW = Math.round(w * 0.25);
+    const tapeH = Math.round(tapeW * 0.22);
+    ctx.fillRect(w / 2 - tapeW / 2, 25, tapeW, tapeH);
   }
+  ctx.restore();
+}
 
-  // Grain template retro (§18): bintik acak tipis, murah (2000 titik).
-  if (tpl.grain) {
-    ctx.save();
-    ctx.globalAlpha = tpl.grain;
-    ctx.fillStyle = "#3a2c1c";
-    for (let i = 0; i < 2000; i++) {
-      const gx = Math.random() * tpl.width;
-      const gy = Math.random() * tpl.height;
-      ctx.fillRect(gx, gy, 2, 2);
-    }
-    ctx.restore();
+function renderGrain(ctx: CanvasRenderingContext2D, w: number, h: number, grain?: number) {
+  if (!grain) return;
+  ctx.save();
+  ctx.globalAlpha = grain;
+  ctx.fillStyle = "#3a2c1c";
+  const dots = Math.round((w * h) / 1000);
+  for (let i = 0; i < dots; i++) {
+    const gx = Math.random() * w;
+    const gy = Math.random() * h;
+    ctx.fillRect(gx, gy, 2, 2);
   }
+  ctx.restore();
+}
 
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.9));
-  if (!blob) throw new Error("Gagal menyusun foto");
-  return blob;
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((res, rej) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) res(blob);
+        else rej(new Error("Gagal menyusun foto"));
+      },
+      "image/jpeg",
+      0.9,
+    );
+  });
 }

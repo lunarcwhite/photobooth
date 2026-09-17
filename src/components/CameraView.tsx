@@ -1,7 +1,11 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { PhotoRatio } from "@/hooks/useCamera";
+import type { LiveFilterId } from "@/lib/filter/types";
+import { initFaceLandmarker, detectFaces } from "@/lib/filter/faceLandmarker";
+import { renderLiveFilter } from "@/lib/filter/renderer";
+import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { IconBtn, Btn } from "@/components/ui";
 import { CameraIcon, LockIcon, MirrorIcon } from "@/components/icons";
 import { CameraTroubleshootModal } from "@/components/CameraTroubleshootModal";
@@ -19,6 +23,9 @@ export const CameraView = memo(function CameraView({
   onCycleRatio,
   onStartCamera,
   message,
+  activeFilter = "none",
+  onFilterLoading,
+  onLandmarksUpdate,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   stream?: MediaStream | null;
@@ -30,8 +37,12 @@ export const CameraView = memo(function CameraView({
   onCycleRatio?: () => void;
   onStartCamera?: () => void;
   message?: string | null;
+  activeFilter?: LiveFilterId;
+  onFilterLoading?: (loading: boolean, msg?: string) => void;
+  onLandmarksUpdate?: (landmarks: NormalizedLandmark[][] | null) => void;
 }) {
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const r = ratio ?? "3:4";
   // Two-dimensional fit via container query: width = min(100%, cell height x ratio).
   const size =
@@ -57,6 +68,68 @@ export const CameraView = memo(function CameraView({
     return () => v.removeEventListener("loadedmetadata", tryPlay);
   }, [videoRef, stream, ready]);
 
+  // Live AR Filter loop via MediaPipe FaceLandmarker
+  useEffect(() => {
+    if (!ready || activeFilter === "none") {
+      const c = overlayCanvasRef.current;
+      if (c) {
+        const ctx = c.getContext("2d");
+        ctx?.clearRect(0, 0, c.width, c.height);
+      }
+      onLandmarksUpdate?.(null);
+      return;
+    }
+
+    let animId: number;
+    let cancelled = false;
+
+    const loop = () => {
+      if (cancelled) return;
+      const v = videoRef.current;
+      const c = overlayCanvasRef.current;
+
+      if (v && c && v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0) {
+        if (c.width !== v.videoWidth || c.height !== v.videoHeight) {
+          c.width = v.videoWidth;
+          c.height = v.videoHeight;
+        }
+
+        const faces = detectFaces(v, performance.now());
+        if (faces !== null) {
+          onLandmarksUpdate?.(faces);
+        }
+
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, c.width, c.height);
+          if (faces && faces.length > 0) {
+            renderLiveFilter(ctx, faces, activeFilter, c.width, c.height);
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    void initFaceLandmarker((status, msg) => {
+      onFilterLoading?.(status === "loading", msg);
+    }).then((landmarker) => {
+      if (landmarker && !cancelled) {
+        animId = requestAnimationFrame(loop);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animId);
+      const c = overlayCanvasRef.current;
+      if (c) {
+        const ctx = c.getContext("2d");
+        ctx?.clearRect(0, 0, c.width, c.height);
+      }
+    };
+  }, [ready, activeFilter, videoRef, onFilterLoading, onLandmarksUpdate]);
+
   const tapPlay = () => {
     videoRef.current?.play().catch(() => {});
   };
@@ -71,6 +144,10 @@ export const CameraView = memo(function CameraView({
         onClick={tapPlay}
         title="Ketuk jika video hitam"
         className={`h-full w-full cursor-pointer object-cover ${mirrored ? "scale-x-[-1]" : ""}`}
+      />
+      <canvas
+        ref={overlayCanvasRef}
+        className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${mirrored ? "scale-x-[-1]" : ""}`}
       />
       {!ready && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 p-3 sm:p-6 text-center bg-booth-night text-booth-creamdim z-10">

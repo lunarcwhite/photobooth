@@ -11,6 +11,8 @@ import { CameraView } from "@/components/CameraView";
 import { CameraIcon, CheckIcon, ClockIcon, RefreshIcon } from "@/components/icons";
 import { POSE_GUIDES } from "@/types/template";
 import { playCountdownBeep, playShutterSound, isSoundMuted, toggleSoundMute } from "@/lib/sound/effects";
+import { LiveFilterSelector } from "@/components/LiveFilterSelector";
+import type { LiveFilterId } from "@/lib/filter/types";
 
 // Mode satu HP (PRD §5): satu kamera, berdua dalam satu bingkai,
 // 4 jepretan strip. Mendukung mode Otomatis dan Manual (tombol shutter)
@@ -43,6 +45,11 @@ export default function SamaPage() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [shots, setShots] = useState<(string | null)[]>([null, null, null, null]);
   const [flash, setFlash] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<LiveFilterId>("none");
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterLoadingMsg, setFilterLoadingMsg] = useState<string | null>(null);
+  const activeFilterRef = useRef(activeFilter);
+  activeFilterRef.current = activeFilter;
   const [error, setError] = useState<string | null>(null);
   const [soundMuted, setSoundMuted] = useState(false);
   useEffect(() => {
@@ -80,7 +87,7 @@ export default function SamaPage() {
       playShutterSound();
 
       try {
-        const blob = await cam.captureShot();
+        const blob = await cam.captureShot(1280, 0.85, activeFilterRef.current);
         const url = await blobToDataURL(blob);
         setShots((prev) => {
           const next = [...prev];
@@ -337,6 +344,12 @@ export default function SamaPage() {
             onCycleRatio={cam.cycleRatio}
             onStartCamera={() => cam.start().then((ok) => ok && track("camera_ready", null))}
             message={cam.message}
+            activeFilter={activeFilter}
+            onFilterLoading={(loading, msg) => {
+              setFilterLoading(loading);
+              setFilterLoadingMsg(msg ?? null);
+            }}
+            onLandmarksUpdate={cam.setLandmarks}
           />
 
           {/* Floating Pose Guide Pill on Mobile (Visible before countdown, keeps camera view uncluttered) */}
@@ -399,6 +412,16 @@ export default function SamaPage() {
 
         {/* Mobile Bottom Console: Camera-First, Compact (< md) */}
         <div className="flex md:hidden shrink-0 flex-col gap-2 pt-0.5 pb-1">
+          {/* Live Filter Selector on Mobile */}
+          {phase !== "done" && (
+            <LiveFilterSelector
+              activeFilter={activeFilter}
+              onChange={setActiveFilter}
+              isLoading={filterLoading}
+              loadingMessage={filterLoadingMsg}
+            />
+          )}
+
           {phase === "idle" ? (
             <div className="booth-card rounded-2xl p-3 space-y-2.5">
               {/* Names input */}
@@ -602,6 +625,18 @@ export default function SamaPage() {
 
         {/* Desktop Sidebar Console & Controls Panel (md: and up) */}
         <div className="hidden md:flex shrink-0 flex-col gap-2.5 md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-80 lg:overflow-visible">
+          {/* Live Filter Selector on Desktop */}
+          {phase !== "done" && (
+            <div className="booth-card rounded-2xl p-2.5 sm:p-3">
+              <LiveFilterSelector
+                activeFilter={activeFilter}
+                onChange={setActiveFilter}
+                isLoading={filterLoading}
+                loadingMessage={filterLoadingMsg}
+              />
+            </div>
+          )}
+
           {/* Phase: IDLE (Pengaturan sebelum mulai) */}
           {phase === "idle" && (
             <div className="booth-card rounded-2xl p-3.5 sm:p-4 space-y-3">

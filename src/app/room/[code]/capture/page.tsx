@@ -19,6 +19,8 @@ import { roomApi } from "@/lib/room/api";
 import { AlertIcon, BackIcon, CameraIcon, CheckIcon, ClockIcon, MicIcon, MicOffIcon } from "@/components/icons";
 import { POSE_GUIDES } from "@/types/template";
 import { playCountdownBeep, playShutterSound, isSoundMuted, toggleSoundMute } from "@/lib/sound/effects";
+import { LiveFilterSelector } from "@/components/LiveFilterSelector";
+import type { LiveFilterId } from "@/lib/filter/types";
 
 // Capture otomatis: jadwal 4 targetTimes jam server dari room-api.start.
 // Host: after session_started kirim mismo ke guest. Guest: bundle lama
@@ -62,6 +64,10 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const [armedShot, setArmedShot] = useState<{ sequence: number; targetAt: number } | null>(null);
 
   const [flash, setFlash] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<LiveFilterId>("none");
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterLoadingMsg, setFilterLoadingMsg] = useState<string | null>(null);
+  const activeFilterRef = useRef(activeFilter);
   const [soundMuted, setSoundMuted] = useState(false);
   useEffect(() => {
     setSoundMuted(isSoundMuted());
@@ -96,6 +102,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
     captureModeRef.current = captureMode;
     timerOptionRef.current = timerOption;
     armedShotRef.current = armedShot;
+    activeFilterRef.current = activeFilter;
   });
   const bgQueue = useRef<{ seq: number; blob: Blob; tries: number }[]>([]);
   const firedRef = useRef<boolean[]>([false, false, false, false]);
@@ -356,7 +363,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       setTimeout(() => setFlash(false), 180);
       playShutterSound();
       try {
-        const blob = await cam.captureShot();
+        const blob = await cam.captureShot(1280, 0.85, activeFilterRef.current);
         const url = await blobToDataURL(blob);
         setMyShots((prev) => {
           const n = [...prev];
@@ -687,6 +694,12 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
               onToggleMirror={cam.toggleMirror}
               ratio={cam.ratio}
               onCycleRatio={isHost ? cam.cycleRatio : undefined}
+              activeFilter={activeFilter}
+              onFilterLoading={(loading, msg) => {
+                setFilterLoading(loading);
+                setFilterLoadingMsg(msg ?? null);
+              }}
+              onLandmarksUpdate={cam.setLandmarks}
             />
           </div>
           <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden [container-type:size]">
@@ -758,6 +771,16 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
         {/* Mobile Bottom Bar: Sleek, compact & Camera-First (< md) */}
         <div className="flex md:hidden shrink-0 flex-col gap-2 pt-0.5 pb-1">
+          {/* Live Filter Selector on Mobile */}
+          {!allDone && (
+            <LiveFilterSelector
+              activeFilter={activeFilter}
+              onChange={setActiveFilter}
+              isLoading={filterLoading}
+              loadingMessage={filterLoadingMsg}
+            />
+          )}
+
           {/* Row 1: 4-Slot Mini Filmstrip & Quick Mode / Timer controls */}
           <div className="flex items-center justify-between gap-2 px-0.5">
             {/* 4 Mini Thumbnails */}
@@ -872,6 +895,18 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
         {/* Desktop Sidebar Console (md: and up, generous layout) */}
         <div className="hidden md:flex shrink-0 flex-col gap-2.5 sm:gap-3 md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-76 lg:overflow-visible">
+          {/* Live Filter Selector on Desktop */}
+          {!allDone && (
+            <div className="booth-card rounded-2xl p-2.5 sm:p-3">
+              <LiveFilterSelector
+                activeFilter={activeFilter}
+                onChange={setActiveFilter}
+                isLoading={filterLoading}
+                loadingMessage={filterLoadingMsg}
+              />
+            </div>
+          )}
+
           {/* Couple Pose Guide Card */}
           {!allDone && currentPose && (
             <div className="booth-card rounded-2xl p-2.5 sm:p-3 border-amber-500/30 bg-amber-500/[0.04] dark:bg-amber-500/[0.06]">

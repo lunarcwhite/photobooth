@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { LiveFilterId } from "@/lib/filter/types";
+import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
+import { renderLiveFilter } from "@/lib/filter/renderer";
 
 export type CameraStatus = "idle" | "requesting" | "ready" | "denied" | "unsupported" | "error";
 
@@ -29,6 +32,11 @@ export function useCamera() {
   // Dibaca di effect (bukan saat render) agar SSR dan client sama.
   const [mirrored, setMirrored] = useState<boolean>(true);
   const [ratio, setRatio] = useState<PhotoRatio>("3:4");
+  const lastLandmarksRef = useRef<NormalizedLandmark[][] | null>(null);
+
+  const setLandmarks = useCallback((faces: NormalizedLandmark[][] | null) => {
+    lastLandmarksRef.current = faces;
+  }, []);
 
   const toggleMirror = useCallback(() => {
     setMirrored((m) => !m);
@@ -160,7 +168,7 @@ export function useCamera() {
   // Grab current frame → JPEG blob. Ikut mode mirror + crop tengah ke rasio
   // terpilih agar file = preview (WYSIWYG).
   const captureShot = useCallback(
-    async (maxSide = 1280, quality = 0.85): Promise<Blob> => {
+    async (maxSide = 1280, quality = 0.85, activeFilter: LiveFilterId = "none"): Promise<Blob> => {
       const video = videoRef.current;
       if (!video || !video.videoWidth) throw new Error("kamera belum siap");
       const target = ratioValue(ratio);
@@ -190,6 +198,19 @@ export function useCamera() {
         ctx.scale(-1, 1);
       }
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+
+      // Render filter aksesoris AR jika aktif (WYSIWYG ke foto fisik)
+      if (activeFilter !== "none" && lastLandmarksRef.current && lastLandmarksRef.current.length > 0) {
+        const adjustedLandmarks = lastLandmarksRef.current.map((face) =>
+          face.map((pt) => ({
+            ...pt,
+            x: (pt.x * video.videoWidth - sx) / sw,
+            y: (pt.y * video.videoHeight - sy) / sh,
+          })),
+        );
+        renderLiveFilter(ctx, adjustedLandmarks, activeFilter, w, h);
+      }
+
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
       if (!blob) throw new Error("gagal mengambil foto");
       return blob;
@@ -197,5 +218,5 @@ export function useCamera() {
     [mirrored, ratio],
   );
 
-  return { videoRef, status, message, start, stop, captureShot, mirrored, toggleMirror, ratio, cycleRatio, setRatio: setRatioExternal, stream, muted, toggleMute, audioOn };
+  return { videoRef, status, message, start, stop, captureShot, mirrored, toggleMirror, ratio, cycleRatio, setRatio: setRatioExternal, stream, muted, toggleMute, audioOn, setLandmarks };
 }

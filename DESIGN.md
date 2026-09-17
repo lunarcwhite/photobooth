@@ -33,15 +33,16 @@ Recommended starting pair:
 Use display typography selectively.
 
 ## 6. Color
-Warm neutral foundation:
-- Background `#F7F4EE`
-- Surface `#FFFDF8`
-- Text `#171717`
-- Muted `#77736B`
-- Border `#DDD8CE`
-- Accent `#FF5C35`
+Modern Clean Minimalist White & Deep Charcoal Slate foundation:
+- Background: `#FFFFFF` (`--color-booth-paper`)
+- Surface / Cards: `#FFFFFF` (`--color-booth-card`)
+- Text: `#0F172A` (`--color-booth-ink`, sharp charcoal slate)
+- Muted: `#64748B` (`--color-booth-muted`)
+- Border: `#E2E8F0` (`--color-booth-line`)
+- Accent: `#0F172A` (`--color-booth-accent`, matching active tab buttons, with `#020617` hover)
+- Camera Viewfinder: `#020617` / `bg-slate-950` (high-contrast dark studio monitor for camera previews)
 
-Keep the interface neutral so photographs remain the hero.
+Keep the interface crisp, light, and neutral so photographs and facial expressions remain the hero.
 
 ## 7. Shape
 Rounded but not bubbly:
@@ -211,26 +212,24 @@ Whitespace, thin border, editorial type.
 ### Polaroid
 White frame, optional handwritten caption.
 
-Templates should eventually be data-driven.
+### Adaptive Canvas Dimensions
+The canvas size (`canvas.width` & `canvas.height`) scales dynamically based on the chosen photo ratio and layout to guarantee 0% face clipping and genuine photostrip proportions:
+- **Strip 1x4**: 600×2430 (1:1), 540×2820 (3:4), 460×3100 (9:16)
+- **Grid 2x2**: 1080×1330 (1:1), 1080×1590 (3:4), 1080×1920 (9:16)
+- **Twin Strip**: 1080×2010 (1:1), 1080×2490 (3:4), 1080×2970 (9:16)
+- **Seamless Duo**: 980×2180 (1:1), 920×2555 (3:4), 840×2985 (9:16)
+- **Grid 8 Slot**: 920×2020 (1:1), 900×2500 (3:4), 840×2980 (9:16)
 
-Suggested configuration:
-```ts
-type TemplateConfig = {
-  id: string
-  name: string
-  canvas: { width: number; height: number }
-  slots: Array<{
-    x: number
-    y: number
-    width: number
-    height: number
-    radius?: number
-  }>
-  background: string
-  typography?: object
-  decorations?: object[]
-}
-```
+Typography, margins, washi tape, and sticker positions scale dynamically relative to `canvasW`.
+
+## 18.1. Live AR Filters (MediaPipe Vision)
+Camera viewfinders support client-side face landmark tracking with real-time AR overlays:
+- 🌸 Flower Crown (`flower_crown`)
+- 🐱 Cat Ears & Whiskers (`cat_ears`)
+- 🕶️ Cool Sunglasses (`sunglasses`)
+- 🎉 Party Cone Hat (`party_hat`)
+- ⭐ Star Sunglasses (`star_glasses`)
+- 👓 Classic Round Retro Glasses (`retro_glasses`)
 
 ## 19. Photo Treatments
 Initial:

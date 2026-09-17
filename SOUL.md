@@ -32,10 +32,10 @@ Prioritize:
 The defining feature is the shared experience between two people. If a feature does not improve that experience, it probably does not belong in the core product.
 
 ### Do not solve problems that do not exist yet
-Build for the current stage. Do not introduce WebRTC, microservices, Redis, custom WebSockets, complex media pipelines, accounts, or social systems without a real requirement.
+Build for the current stage. Do not introduce microservices, Redis, custom WebSocket servers, complex backend media pipelines, accounts, or social systems without a real requirement.
 
-### Browser first
-Prefer MediaDevices, Canvas, Web Share, local/session storage, Supabase Realtime and Postgres before adding infrastructure.
+### Browser first & Local Processing
+Prefer MediaDevices, HTML5 Canvas, WebRTC P2P, Web Share, `@mediapipe/tasks-vision` (client-side WebAssembly/GPU delegate), and Supabase Realtime before adding heavy server infrastructure. All face tracking and final photo composition happen directly in the browser memory.
 
 ## Technical Principles
 

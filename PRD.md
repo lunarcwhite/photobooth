@@ -83,30 +83,29 @@ Target MVP tolerance: approximately ±150–250 ms.
 ### Four Shots
 Default 4 photos with 3–2–1 countdown.
 
-### Composition
-Canvas API. Initial templates:
-1. Classic vertical strip
-2. Minimal editorial strip
-3. Polaroid/grid variant
+### Composition & Adaptive Canvas
+Canvas API with dynamic sizing (`canvasW` and `canvasH`) based on photo aspect ratio (1:1, 3:4, 9:16) and layout (`single` 1x4, `twin` strip, `grid2x2` polaroid, `seamless` duo, `split` 8-slot) to guarantee 0% face clipping and authentic photostrip proportions.
 
-Target final short side: at least 1080px.
-
-### Customization
-MVP: template/frame, simple caption, limited stickers.
-Later: filters, grain, light leaks, text styling, crop/rotation, community templates.
+### Customization & Enhancements
+- Frames: Classic, Retro, Minimal, Polaroid.
+- Color Filters: Original, Warm, B&W, Vintage.
+- Decors: None, Sparkle, Ribbon, Hearts, Cats, Washi Tape.
+- Live AR Accessories: Flower crown, Cat ears, Sunglasses, Party cone, Star glasses, Retro round glasses via `@mediapipe/tasks-vision`.
+- Animated GIF Maker: 4-frame looping GIF export via `gifenc`.
+- Clipboard Copy: One-click copy blob to clipboard.
+- QR Code Sharing: Scan to join booth and scan to download result.
 
 ### Result
-Large preview, Download, Share when supported, Retake, Back to booth. No mandatory upload.
+Dynamic preview, Download, Share via Web Share API, Clipboard Copy, Animated GIF Generation, QR Code Download, Retake. No mandatory upload.
 
 ## 7. Technical Architecture
-Frontend: Next.js, React, TypeScript, Tailwind CSS.
-Backend: Supabase PostgreSQL + Realtime; Storage only if persistent/shared results are needed.
+Frontend: Next.js 16 (Turbopack), React 19, TypeScript, Tailwind CSS v4.
+Realtime & Signaling: Supabase PostgreSQL + Realtime Presence & Broadcast Channels.
+P2P Video Call: WebRTC via `RTCPeerConnection` with Metered.ca TURN server relay.
+Computer Vision: `@mediapipe/tasks-vision` for client-side face landmark tracking.
+Media Processing: HTML5 Canvas API + `gifenc` for GIF encoding.
+Audio: Web Audio API Synthesizer (beep countdown and mechanical shutter).
 Hosting: Vercel.
-Browser APIs: MediaDevices, Canvas, Web Share.
-
-Avoid in MVP: Laravel, Filament, custom WebSocket server, Redis, WebRTC, server-side image processing, video uploads.
-
-WebRTC is a later option only if live partner video becomes an actual requirement.
 
 ## 8. Data Model
 

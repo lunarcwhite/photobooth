@@ -36,22 +36,39 @@ Aplikasi ini berjalan 100% langsung di peramban (browser) ponsel atau laptop:
 - **Mode Satu HP Bareng (`/sama`)**:
   - Ambil 4 pose bersama dalam 1 perangkat tanpa memerlukan koneksi internet dua arah.
 
-### 2. 📐 Tata Letak & Rasio Adaptif (Anti-Terpotong)
-- **Pilihan Rasio**: Potret Klasik (`3:4`), Persegi Instagram (`1:1`), dan Vertikal Penuh (`9:16`).
-- **Pilihan Layout**:
-  - **Bilik Bersatu**: 4 frame lebar menyatu seolah berada di dalam satu bilik foto yang sama.
-  - **Strip Kembar (Twin Cut)**: 2 strip lengkap berdampingan dengan garis potong gunting (`✂️`).
-  - **Grid 2x2**: 4 foto dalam bingkai kotak polaroid modern.
-  - **Strip 1x4**: Strip vertikal klasik 4 foto bertumpuk.
+### 2. 🎭 Live AR Filter & Emoticon (MediaPipe Vision)
+- **Deteksi Wajah Real-time**: Didukung pustaka `@mediapipe/tasks-vision` (FaceLandmarker) yang berjalan langsung di browser perangkat pengguna tanpa server.
+- **Pilihan Aksesori & Emoticon Lucu**:
+  - 🌸 **Mahkota Bunga** (Flower Crown)
+  - 🐱 **Telinga Kucing** (Cat Ears & Whiskers)
+  - 🕶️ **Kacamata Hitam Keren** (Cool Shades)
+  - 🎉 **Topi Pesta Meriah** (Party Cone Hat)
+  - ⭐ **Kacamata Bintang Retro** (Star Sunglasses)
+  - 👓 **Kacamata Vintage Bulat** (Classic Round Glasses)
+- Aksesori otomatis terpasang dan mengikuti posisi wajah saat berpose di layar kamera sebelum dan saat hitung mundur jepretan berlangsung.
 
-### 3. 🎞️ Fitur Kreatif & Berbagi
+### 3. 📐 Sistem Kanvas Adaptif Otomatis (Anti-Terpotong)
+- **Dimensi Kanvas Dinamis**: Ukuran kanvas cetak (`canvas.width` dan `canvas.height`) otomatis membesar/mengecil menyesuaikan pilihan rasio foto agar proporsional tanpa memotong dahi atau dagu wajah:
+  - **1:1 Persegi**: Format Instagram square & bookmark photostrip kotak seimbang (misal 600×2430 px pada strip 1x4, 1080×1330 px pada Grid 2x2).
+  - **3:4 Potret Klasik**: Format strip photobooth klasik proporsional (540×2820 px pada strip 1x4).
+  - **9:16 Vertikal Penuh**: Format cerita Instagram/TikTok ramping (460×3100 px pada strip 1x4).
+- **Pilihan Layout**:
+  - **Bilik Bersatu (Seamless Duo)**: 4 baris lebar menyatukan foto host dan teman seolah di dalam satu bilik tanpa sekat.
+  - **Strip Kembar (Twin Cut)**: 2 strip lengkap berdampingan dengan penanda garis potong putus-putus dan gunting (`✂️`).
+  - **Grid 2x2**: 4 foto dalam bingkai kartu polaroid/poster modern.
+  - **Strip 1x4**: Strip vertikal klasik 4 foto bertumpuk.
+  - **Grid 8 Slot**: 8 foto berdampingan untuk arsip lengkap berdua.
+
+### 4. 🎞️ Fitur Kreatif & Berbagi
 - **🎞️ Pembuat Animasi GIF (Boomerang Loop)**: Menggabungkan 4 pose menjadi file `.gif` bergerak yang siap diunggah ke Instagram Story atau TikTok via pustaka `gifenc`.
 - **📋 Salin Foto ke Clipboard (Ctrl+V)**: Satu klik untuk langsung menempelkan strip foto ke WhatsApp Web, Telegram, atau Canva tanpa harus mengunduh file fisik.
 - **📱 QR Code Sharing**: *Scan to Join* di ruang tunggu dan *Scan to Download* di halaman hasil agar teman di samping host cukup mengarahkan kamera HP untuk bergabung atau mengunduh foto.
-- **✨ Stiker & Cap Lucu**: Pilihan dekorasi ekspresif (Pita `🎀`, Hati `💖`, Kucing `🐾`, Sparkles `✨`, Washi Tape).
+- **✨ Stiker & Cap Lucu**: Pilihan dekorasi ekspresif (Pita `🎀`, Hati `💖`, Kucing `🐾`, Sparkles `✦`, Washi Tape).
+- **🎨 Tema Putih Bersih & Charcoal Slate Modern**: Antarmuka minimalis elegan dengan aksen charcoal `#0f172a` yang kontras dan nyaman dipandang.
 - **🎵 Efek Suara Rana & Beep**: Suara mekanik rana kamera dan hitung mundur menggunakan *Web Audio API* sintetis (0 KB aset eksternal, nol latensi, 100% offline).
 
-### 4. 🛡️ Keamanan & Kestabilan WebRTC
+### 5. 🛡️ Keamanan & Kestabilan WebRTC
+- **Viewfinder Kamera Studio (`bg-slate-950`)**: Monitor kamera dengan kontras tinggi sehingga teks instruksi dan badge kode kamar selalu terbaca jelas.
 - **Dual-Relay TURN Metered.ca**: Didukung integrasi TURN server untuk memastikan video call P2P tetap lancar dan tidak putus pada jaringan data seluler (4G/5G).
 - **Panduan Izin Kamera Terblokir**: Modal bantuan interaktif untuk pengguna Google Chrome, Safari iOS, dan in-app browser (Instagram/TikTok/WhatsApp).
 - **SEO & PWA Ready**: Metadata OpenGraph 1200×630 dinamis, `sitemap.xml`, `robots.txt`, dan Web App Manifest.
@@ -120,6 +137,7 @@ Proyek ini telah dikonfigurasi secara optimal untuk platform **Vercel** dengan f
 - **Framework**: [Next.js 16](https://nextjs.org/) (App Router, Turbopack, ImageResponse)
 - **Bahasa**: [TypeScript](https://www.typescriptlang.org/)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Live AR & Face Tracking**: [@mediapipe/tasks-vision](https://developers.google.com/mediapipe/solutions/vision/face_landmarker) (WebAssembly / GPU delegate)
 - **Realtime & Storage**: [Supabase](https://supabase.com/) (Realtime Presence, Broadcast & Storage)
 - **P2P Video Call**: WebRTC via `RTCPeerConnection` + [Metered.ca](https://www.metered.ca/) TURN Relay
 - **Audio Engine**: Web Audio API Synthesizer

@@ -190,7 +190,7 @@ export async function composeFinal(
         ctx.restore();
       } else if (decor === "sparkle") {
         ctx.save();
-        ctx.fillStyle = dark ? "#FFD9A0" : "#ff432a";
+        ctx.fillStyle = dark ? "#FFD9A0" : "#0f172a";
         ctx.font = "400 32px serif";
         ctx.fillText("✦", canvasW / 2 - slotW / 2 + 10, 85);
         ctx.fillText("✦", canvasW / 2 + slotW / 2 - 10, 85);
@@ -836,7 +836,7 @@ function renderGlobalDecor(
     ctx.fillText("🐾", cornerOffset, h - cornerOffset);
     ctx.fillText("🐾", w - cornerOffset, h - cornerOffset);
   } else if (decor === "sparkle") {
-    ctx.fillStyle = dark ? "#FFD9A0" : "#ff432a";
+    ctx.fillStyle = dark ? "#FFD9A0" : "#0f172a";
     ctx.font = `${Math.round(w * 0.06)}px serif`;
     ctx.fillText("✦", cornerOffset, cornerOffset);
     ctx.fillText("✦", w - cornerOffset, cornerOffset);

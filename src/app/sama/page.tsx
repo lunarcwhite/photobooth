@@ -903,7 +903,7 @@ export default function SamaPage() {
                     type="button"
                     onClick={triggerManualShot}
                     disabled={isCapturing}
-                    className="flex min-h-[48px] sm:min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-booth-accent text-white px-5 py-3 font-bold text-sm sm:text-base shadow-[0_2px_12px_rgba(255,92,53,0.35)] hover:bg-booth-accent-deep active:scale-98 transition disabled:opacity-50 cursor-pointer"
+                    className="flex min-h-[48px] sm:min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-booth-accent text-white px-5 py-3 font-bold text-sm sm:text-base shadow-[0_2px_12px_rgba(15,23,42,0.25)] hover:bg-booth-accent-deep active:scale-98 transition disabled:opacity-50 cursor-pointer"
                   >
                     <CameraIcon size={20} />
                     {isCapturing

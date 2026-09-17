@@ -15,7 +15,7 @@ export function Btn({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: Tone }) {
   const toneCls =
     tone === "accent"
-      ? "bg-booth-accent text-white hover:bg-booth-accent-deep active:bg-booth-accent-deep shadow-[0_2px_8px_-1px_rgba(255,92,53,0.35)] disabled:bg-booth-line/70 disabled:text-booth-muted disabled:shadow-none dark:disabled:bg-booth-nightline dark:disabled:text-booth-creamdim"
+      ? "bg-booth-accent text-white hover:bg-booth-accent-deep active:bg-booth-accent-deep shadow-[0_2px_8px_-1px_rgba(15,23,42,0.25)] disabled:bg-booth-line/70 disabled:text-booth-muted disabled:shadow-none dark:disabled:bg-booth-nightline dark:disabled:text-booth-creamdim"
       : "bg-booth-ink text-booth-paper hover:bg-black active:bg-black dark:bg-booth-cream dark:text-booth-night dark:hover:bg-white shadow-[0_2px_6px_rgba(23,19,16,0.2)] disabled:bg-booth-line/70 disabled:text-booth-muted disabled:shadow-none dark:disabled:bg-booth-nightline dark:disabled:text-booth-creamdim";
   return (
     <button

@@ -14,8 +14,8 @@
   --color-booth-ink: #0f172a;
   --color-booth-muted: #64748b;
   --color-booth-line: #e2e8f0;
-  --color-booth-accent: #ff432a;
-  --color-booth-accent-deep: #dc2626;
+  --color-booth-accent: #0f172a;
+  --color-booth-accent-deep: #020617;
   --color-booth-night: #ffffff;
   --color-booth-nightcard: #ffffff;
   --color-booth-nightline: #e2e8f0;
@@ -69,7 +69,7 @@ body {
 }
 
 ::selection {
-  background: rgba(255, 67, 42, 0.15);
+  background: rgba(15, 23, 42, 0.12);
   color: inherit;
 }
 

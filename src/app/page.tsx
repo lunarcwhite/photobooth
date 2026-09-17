@@ -342,7 +342,7 @@ export default function Landing() {
                             ? "bg-[#F4E9D8] border-[#DECDB5] text-[#4A3B2C]"
                             : isMinimal
                               ? "bg-white border-[#E0E0E0] text-black"
-                              : "bg-[#FFFDF8] border-[#E8E2D4] text-[#222]"
+                              : "bg-white border-slate-200 text-slate-900"
                       }`}
                     >
                       <div className="w-full flex items-center justify-between px-1">

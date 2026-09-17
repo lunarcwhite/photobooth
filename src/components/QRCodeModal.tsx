@@ -28,8 +28,8 @@ export function QRCodeModal({
       width: 320,
       margin: 1.5,
       color: {
-        dark: "#171310",
-        light: "#FFFDF8",
+        dark: "#0f172a",
+        light: "#ffffff",
       },
       errorCorrectionLevel: "M",
     })
@@ -94,7 +94,7 @@ export function QRCodeModal({
         </p>
 
         {/* Kotak QR Code */}
-        <div className="mt-5 p-3 rounded-2xl bg-[#FFFDF8] border-2 border-booth-line shadow-inner dark:border-booth-nightline flex items-center justify-center min-h-[220px] min-w-[220px]">
+        <div className="mt-5 p-3 rounded-2xl bg-white border-2 border-booth-line shadow-inner flex items-center justify-center min-h-[220px] min-w-[220px]">
           {qrDataUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

@@ -1,101 +1,66 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-display: var(--font-display-ui), Georgia, serif;
   --font-sans: var(--font-sans-ui), system-ui, sans-serif;
 }
 
-/* Token warna DESIGN §6: netral hangat, foto jadi hero. Aksen satu. */
+/* Token warna: Bersih, putih modern, minimalist slate, tanpa tone coklat/warm */
 @theme {
-  --color-booth-paper: #f7f4ee;
-  --color-booth-card: #fffdf8;
-  --color-booth-ink: #171717;
-  --color-booth-muted: #77736b;
-  --color-booth-line: #ddd8ce;
-  --color-booth-accent: #ff5c35;
-  --color-booth-accent-deep: #d64a28;
-  --color-booth-night: #171310;
-  --color-booth-nightcard: #221a14;
-  --color-booth-nightline: #3a2e22;
-  --color-booth-cream: #f5ede0;
-  --color-booth-creamdim: #c9bba6;
+  --color-booth-paper: #ffffff;
+  --color-booth-card: #ffffff;
+  --color-booth-ink: #0f172a;
+  --color-booth-muted: #64748b;
+  --color-booth-line: #e2e8f0;
+  --color-booth-accent: #ff432a;
+  --color-booth-accent-deep: #dc2626;
+  --color-booth-night: #ffffff;
+  --color-booth-nightcard: #ffffff;
+  --color-booth-nightline: #e2e8f0;
+  --color-booth-cream: #0f172a;
+  --color-booth-creamdim: #64748b;
 }
 
 body {
   font-family: var(--font-sans-ui), system-ui, sans-serif;
   color: var(--color-booth-ink);
+  background-color: #ffffff;
 }
 
 .font-display {
   font-family: var(--font-display-ui), Georgia, serif;
 }
 
-/* Retro booth backdrop: flat paper with a faint vignette. No blobs. */
+/* Modern clean white booth backdrop */
 .booth-bg {
-  background-color: var(--color-booth-paper);
+  background-color: #ffffff;
   background-image: radial-gradient(
     ellipse 90% 70% at 50% 0%,
-    rgba(255, 255, 255, 0.7) 0,
-    transparent 60%
+    rgba(241, 245, 249, 0.7) 0,
+    transparent 80%
   );
 }
 
-@media (prefers-color-scheme: dark) {
-  .booth-bg {
-    background-color: var(--color-booth-night);
-    background-image: radial-gradient(
-      ellipse 90% 70% at 50% 0%,
-      rgba(245, 237, 224, 0.06) 0,
-      transparent 60%
-    );
-  }
-  body {
-    color: var(--color-booth-cream);
-  }
-}
-
 .booth-card {
-  background-color: var(--color-booth-card);
+  background-color: #ffffff;
   border: 1px solid var(--color-booth-line);
   box-shadow:
-    0 1px 3px rgba(33, 28, 20, 0.06),
-    0 12px 32px -16px rgba(33, 28, 20, 0.16);
-}
-
-@media (prefers-color-scheme: dark) {
-  .booth-card {
-    background-color: var(--color-booth-nightcard);
-    border-color: var(--color-booth-nightline);
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.4),
-      0 16px 36px -16px rgba(0, 0, 0, 0.6);
-  }
+    0 1px 3px rgba(15, 23, 42, 0.04),
+    0 12px 32px -16px rgba(15, 23, 42, 0.08);
 }
 
 /* Photobooth print physical paper shadow */
 .shadow-print {
   box-shadow:
-    0 2px 4px rgba(23, 19, 16, 0.06),
-    0 12px 24px -6px rgba(23, 19, 16, 0.14),
-    0 24px 48px -12px rgba(23, 19, 16, 0.22);
-}
-
-@media (prefers-color-scheme: dark) {
-  .shadow-print {
-    box-shadow:
-      0 4px 8px rgba(0, 0, 0, 0.6),
-      0 20px 40px -10px rgba(0, 0, 0, 0.85);
-  }
+    0 2px 6px rgba(15, 23, 42, 0.04),
+    0 14px 28px -6px rgba(15, 23, 42, 0.09),
+    0 28px 56px -12px rgba(15, 23, 42, 0.12);
 }
 
 .booth-hairline {
   border-color: var(--color-booth-line);
-}
-
-@media (prefers-color-scheme: dark) {
-  .booth-hairline {
-    border-color: var(--color-booth-nightline);
-  }
 }
 
 :focus-visible {
@@ -104,7 +69,7 @@ body {
 }
 
 ::selection {
-  background: rgba(255, 92, 53, 0.2);
+  background: rgba(255, 67, 42, 0.15);
   color: inherit;
 }
 

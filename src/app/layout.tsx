@@ -17,10 +17,7 @@ const bodyFont = Geist({
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://photobooth-five-virid.vercel.app";
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F4EE" },
-    { media: "(prefers-color-scheme: dark)", color: "#171310" },
-  ],
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

@@ -114,7 +114,7 @@ export const TEMPLATES: [TemplateConfig, TemplateConfig, TemplateConfig, Templat
     name: "Klasik",
     width: 1080,
     height: 1920,
-    background: "#FFFDF8",
+    background: "#ffffff",
     slots: [
       { x: 60, y: 180, width: 470, height: 380 },
       { x: 550, y: 180, width: 470, height: 380 },

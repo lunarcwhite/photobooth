@@ -406,21 +406,6 @@ export async function composeFinal(
         ctx.restore();
       }
 
-      // Hiasan
-      if (decor === "tape") {
-        ctx.save();
-        ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
-        ctx.fillRect(tpl.width / 2 - 90, 125, 180, 42);
-        ctx.restore();
-      } else if (decor === "sparkle") {
-        ctx.save();
-        ctx.fillStyle = dark ? "#FFD9A0" : "#C93A2E";
-        ctx.font = "400 40px serif";
-        ctx.fillText("✦", tpl.width / 2 - 260, 105);
-        ctx.fillText("✦", tpl.width / 2 + 260, 105);
-        ctx.restore();
-      }
-
       // Footer
       ctx.fillStyle = dark ? "#ffffff" : "#111111";
       if (tpl.text.showNames) {
@@ -552,36 +537,37 @@ export async function composeFinal(
     ctx.textBaseline = "middle";
 
     if (decor === "ribbon") {
-      ctx.font = "50px sans-serif";
-      ctx.fillText("🎀", tpl.width / 2, 75);
+      ctx.font = "46px sans-serif";
+      ctx.fillText("🎀", 95, 95);
+      ctx.fillText("🎀", tpl.width - 95, 95);
       ctx.font = "38px sans-serif";
       ctx.fillText("🎀", 80, tpl.height - 110);
       ctx.fillText("🎀", tpl.width - 80, tpl.height - 110);
     } else if (decor === "hearts") {
-      ctx.font = "46px sans-serif";
-      ctx.fillText("💖", tpl.width / 2 - 130, 75);
-      ctx.fillText("💕", tpl.width / 2 + 130, 75);
+      ctx.font = "42px sans-serif";
+      ctx.fillText("💖", 95, 95);
+      ctx.fillText("💕", tpl.width - 95, 95);
       ctx.font = "36px sans-serif";
       ctx.fillText("💗", 75, tpl.height - 110);
       ctx.fillText("💗", tpl.width - 75, tpl.height - 110);
     } else if (decor === "cats") {
-      ctx.font = "42px sans-serif";
-      ctx.fillText("🐾", tpl.width / 2 - 110, 75);
-      ctx.fillText("🐾", tpl.width / 2 + 110, 75);
+      ctx.font = "38px sans-serif";
+      ctx.fillText("🐾", 95, 95);
+      ctx.fillText("🐾", tpl.width - 95, 95);
       ctx.font = "34px sans-serif";
       ctx.fillText("🐾", 75, tpl.height - 105);
       ctx.fillText("🐾", tpl.width - 75, tpl.height - 105);
     } else if (decor === "sparkle") {
       ctx.fillStyle = dark ? "#FFD9A0" : "#C93A2E";
-      ctx.font = "46px serif";
-      ctx.fillText("✦", tpl.width / 2 - 240, 75);
-      ctx.fillText("✦", tpl.width / 2 + 240, 75);
+      ctx.font = "42px serif";
+      ctx.fillText("✦", 95, 95);
+      ctx.fillText("✦", tpl.width - 95, 95);
       ctx.font = "36px sans-serif";
       ctx.fillText("✨", 80, tpl.height - 110);
       ctx.fillText("✨", tpl.width - 80, tpl.height - 110);
     } else if (decor === "tape") {
       ctx.fillStyle = "rgba(233, 220, 196, 0.85)";
-      ctx.fillRect(tpl.width / 2 - 90, 50, 180, 44);
+      ctx.fillRect(tpl.width / 2 - 90, 30, 180, 40);
     }
     ctx.restore();
   }

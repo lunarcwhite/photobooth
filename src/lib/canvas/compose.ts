@@ -1,9 +1,5 @@
 import type { PhotoDecor, PhotoRatio, PhotoStyle, RemoteLayout, SoloLayout, TemplateConfig } from "@/types/template";
 
-function ratioMultiplier(r: PhotoRatio): number {
-  return r === "1:1" ? 1.0 : r === "9:16" ? 9 / 16 : 3 / 4;
-}
-
 export function imageFromURL(url: string): Promise<HTMLImageElement | null> {
   if (!url) return Promise.resolve(null);
   return new Promise((resolve) => {
@@ -88,7 +84,6 @@ export async function composeFinal(
   const isSolo = Boolean(opts.isSolo);
   const soloLayout: SoloLayout = opts.soloLayout ?? "single";
   const ratio: PhotoRatio = opts.ratio ?? "3:4";
-  const mult = ratioMultiplier(ratio);
 
   const canvas = document.createElement("canvas");
   canvas.width = tpl.width;
@@ -107,10 +102,10 @@ export async function composeFinal(
       // ✂️ LAYOUT STRIP KEMBAR (Twin Strip 2 Lembar untuk Berdua)
       // Strip Kiri (x: 0..540) & Strip Kanan (x: 540..1080)
       const slotH = 355;
-      const slotW = Math.min(480, Math.round(slotH * mult));
+      const slotW = 450;
       const slotY = [160, 540, 920, 1300];
-      const leftX = Math.round(270 - slotW / 2);
-      const rightX = Math.round(810 - slotW / 2);
+      const leftX = 45;
+      const rightX = 585;
 
       // Judul masing-masing strip
       ctx.fillStyle = dark ? "#ffffff" : "#111111";
@@ -124,10 +119,10 @@ export async function composeFinal(
         const img = rawImages[i];
         const y = slotY[i];
         // Strip Kiri
-        if (img) drawCover(ctx, img, leftX, y, slotW, slotH, style);
+        if (img) drawCover(ctx, img, leftX, y, slotW, slotH, style, 0.18);
         else placeholder(ctx, leftX, y, slotW, slotH);
         // Strip Kanan
-        if (img) drawCover(ctx, img, rightX, y, slotW, slotH, style);
+        if (img) drawCover(ctx, img, rightX, y, slotW, slotH, style, 0.18);
         else placeholder(ctx, rightX, y, slotW, slotH);
       }
 
@@ -292,7 +287,7 @@ export async function composeFinal(
       ctx.fillText(tpl.text.title, tpl.width / 2, 115);
 
       const slotH = 360;
-      const slotW = Math.round(slotH * mult);
+      const slotW = 760;
       const slotX = Math.round((tpl.width - slotW) / 2);
       const slotY = [160, 545, 930, 1315];
 
@@ -303,7 +298,7 @@ export async function composeFinal(
         ctx.beginPath();
         ctx.roundRect(slotX, y, slotW, slotH, 16);
         ctx.clip();
-        if (img) drawCover(ctx, img, slotX, y, slotW, slotH, style);
+        if (img) drawCover(ctx, img, slotX, y, slotW, slotH, style, 0.18);
         else placeholder(ctx, slotX, y, slotW, slotH);
         ctx.restore();
 
@@ -359,11 +354,11 @@ export async function composeFinal(
 
       const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
 
-      // 4 Baris Horizontal yang menyatukan kedua orang dengan rasio adaptif
+      // 4 Baris Horizontal Lebar yang menyatukan kedua orang (proporsional memenuhi frame)
+      const rowW = 960;
       const rowH = 360;
-      const halfW = Math.round(rowH * mult);
-      const rowW = halfW * 2;
       const startX = Math.round((tpl.width - rowW) / 2);
+      const halfW = rowW / 2;
       const rowY = [160, 545, 930, 1315];
       const cornerR = 20;
 
@@ -425,10 +420,10 @@ export async function composeFinal(
     } else if (remoteLayout === "twin") {
       // ✂️ STRIP KEMBAR DUO (Strip Host di Kiri, Strip Guest di Kanan)
       const slotH = 355;
-      const slotW = Math.min(480, Math.round(slotH * mult));
+      const slotW = 450;
       const slotY = [160, 540, 920, 1300];
-      const leftX = Math.round(270 - slotW / 2);
-      const rightX = Math.round(810 - slotW / 2);
+      const leftX = 45;
+      const rightX = 585;
 
       const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
 
@@ -495,11 +490,11 @@ export async function composeFinal(
       ctx.font = `700 54px Georgia, serif`;
       ctx.fillText(tpl.text.title, tpl.width / 2, 100);
 
-      const slotH = 355;
-      const slotW = Math.min(480, Math.round(slotH * mult));
-      const col1X = Math.round(270 - slotW / 2);
-      const col2X = Math.round(810 - slotW / 2);
-      const rowY = [160, 540, 920, 1300];
+      const slotH = 360;
+      const slotW = 460;
+      const col1X = 55;
+      const col2X = 565;
+      const rowY = [160, 545, 930, 1315];
 
       const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
       for (let i = 0; i < 8; i++) {
@@ -515,17 +510,17 @@ export async function composeFinal(
       ctx.fillStyle = dark ? "#ffffff" : "#111111";
       if (tpl.text.showNames) {
         ctx.font = "600 44px Georgia, serif";
-        ctx.fillText(opts.names, tpl.width / 2, tpl.height - 110);
+        ctx.fillText(opts.names, tpl.width / 2, 1745);
       }
       if (tpl.text.showDate) {
-        ctx.font = "400 34px Georgia, serif";
+        ctx.font = "400 32px Georgia, serif";
         ctx.fillStyle = dark ? "#bbbbbb" : "#555555";
-        ctx.fillText(opts.date, tpl.width / 2, tpl.height - 55);
+        ctx.fillText(opts.date, tpl.width / 2, 1805);
       }
       if (caption) {
         ctx.fillStyle = dark ? "#e8e2d5" : "#333333";
-        ctx.font = "italic 400 36px Georgia, serif";
-        ctx.fillText(caption, tpl.width / 2, tpl.height - 12);
+        ctx.font = "italic 400 32px Georgia, serif";
+        ctx.fillText(caption, tpl.width / 2, 1860);
       }
     }
   }

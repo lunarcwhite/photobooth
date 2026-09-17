@@ -15,13 +15,19 @@ import {
   PHOTO_DECORS,
   SOLO_LAYOUTS,
   REMOTE_LAYOUTS,
+  PHOTO_RATIO_OPTIONS,
   type PhotoDecor,
   type PhotoStyle,
   type SoloLayout,
   type RemoteLayout,
+  type PhotoRatio,
 } from "@/types/template";
 import { Btn, GhostBtn, ErrorMsg, StepBadge, Segmented, Field } from "@/components/ui";
 import { CheckIcon, ClockIcon, DownloadIcon, RefreshIcon, ShareIcon } from "@/components/icons";
+import { QRCodeModal } from "@/components/QRCodeModal";
+import { copyBlobToClipboard } from "@/lib/canvas/clipboard";
+import { createAnimatedGif } from "@/lib/canvas/gif";
+import { GifPreviewModal } from "@/components/GifPreviewModal";
 
 export default function ResultPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = use(params);
@@ -33,6 +39,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
   const [tplIndex, setTplIndex] = useState(0);
   const [soloLayout, setSoloLayout] = useState<SoloLayout>("single");
   const [remoteLayout, setRemoteLayout] = useState<RemoteLayout>("seamless");
+  const [ratio, setRatio] = useState<PhotoRatio>("3:4");
   const [partnerShots, setPartnerShots] = useState<(string | null)[]>([null, null, null, null]);
   const [loading, setLoading] = useState<boolean[]>([false, false, false, false]);
   const [finalUrl, setFinalUrl] = useState<string | null>(null);
@@ -47,6 +54,11 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
   const [backHome, setBackHome] = useState(false);
   const [mobileTab, setMobileTab] = useState<"layout" | "frame" | "filter">("layout");
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [copiedClipboard, setCopiedClipboard] = useState(false);
+  const [gifBlob, setGifBlob] = useState<Blob | null>(null);
+  const [gifModalOpen, setGifModalOpen] = useState(false);
+  const [generatingGif, setGeneratingGif] = useState(false);
 
   // Ambil ulang sinkron: salah satu menekan → kedua HP kembali ke booth.
   const mePresence = useMemo(
@@ -76,6 +88,9 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     if (s) {
       setPartnerShots(s.partnerShots);
       setMobileTab("layout");
+      if (s.ratio) {
+        setRatio(s.ratio);
+      }
     }
     setBundle(loadRoomBundle(code));
     setMounted(true);
@@ -166,6 +181,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
           isSolo: Boolean(shots.solo),
           soloLayout,
           remoteLayout,
+          ratio,
         });
         if (cancelled) return;
         setFinalUrl((prev) => {
@@ -183,7 +199,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     return () => {
       cancelled = true;
     };
-  }, [shots, tpl, slots, style, decor, caption, soloLayout, remoteLayout]);
+  }, [shots, tpl, slots, style, decor, caption, soloLayout, remoteLayout, ratio]);
 
   // Ambil ulang: broadcast retake → kedua HP kembali ke booth.
   const retake = async () => {
@@ -227,6 +243,38 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     download();
   };
 
+  const handleCopy = async () => {
+    if (!finalBlob) return;
+    const ok = await copyBlobToClipboard(finalBlob);
+    if (ok) {
+      setCopiedClipboard(true);
+      setTimeout(() => setCopiedClipboard(false), 2500);
+    }
+  };
+
+  const handleMakeGif = async () => {
+    if (!shots) return;
+    setGeneratingGif(true);
+    try {
+      const names = shots.solo
+        ? (shots.myName || "Kamu & Teman")
+        : [shots.myName, shots.partnerName].filter(Boolean).join(" & ");
+      const blob = await createAnimatedGif(slots, {
+        isSolo: Boolean(shots.solo),
+        ratio,
+        style,
+        names,
+        date: shots.date,
+      });
+      setGifBlob(blob);
+      setGifModalOpen(true);
+    } catch (e) {
+      console.error("Gagal membuat animasi GIF:", e);
+    } finally {
+      setGeneratingGif(false);
+    }
+  };
+
   if (!mounted || !shots) {
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-10">
@@ -254,7 +302,15 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowQr(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-booth-line px-3 py-1.5 text-xs font-semibold text-booth-muted hover:text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:text-booth-creamdim dark:hover:text-white"
+            title="Scan QR untuk buka di HP"
+          >
+            <span>📱</span>
+            <span className="hidden sm:inline">QR Unduh</span>
+          </button>
           <button
             onClick={() => setBackHome(true)}
             className="rounded-xl border border-booth-line px-3.5 py-1.5 text-xs font-semibold text-booth-muted hover:text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:text-booth-creamdim dark:hover:text-white"
@@ -371,6 +427,23 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
                     </p>
                   </>
                 )}
+
+                <div className="pt-2 border-t border-booth-line/40 dark:border-booth-nightline/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-booth-muted dark:text-booth-creamdim">
+                      Rasio Asli Foto
+                    </span>
+                    <span className="text-[9px] font-semibold text-booth-accent">
+                      {PHOTO_RATIO_OPTIONS.find((r) => r.value === ratio)?.desc}
+                    </span>
+                  </div>
+                  <Segmented
+                    label="Pilih rasio foto"
+                    value={ratio}
+                    onChange={(v) => setRatio(v as PhotoRatio)}
+                    options={PHOTO_RATIO_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
+                  />
+                </div>
               </div>
             )}
 
@@ -427,14 +500,27 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
 
           {/* Mobile Actions */}
           <div className="flex flex-col gap-1.5 pt-0.5">
-            <div className="grid grid-cols-2 gap-2">
-              <Btn tone="accent" onClick={download} disabled={!finalBlob} className="text-xs sm:text-sm font-bold py-2.5 shadow-md">
-                <DownloadIcon size={16} />
-                Unduh Foto
+            <div className="grid grid-cols-3 gap-1.5">
+              <Btn tone="accent" onClick={download} disabled={!finalBlob} className="text-xs font-bold py-2.5 shadow-md">
+                <DownloadIcon size={15} />
+                Unduh
               </Btn>
-              <GhostBtn onClick={share} disabled={!finalBlob} className="text-xs sm:text-sm font-bold py-2.5">
-                {shared ? <CheckIcon size={16} className="text-emerald-500" /> : <ShareIcon size={16} />}
-                {shared ? "Tersimpan" : "Bagikan"}
+              <GhostBtn onClick={handleCopy} disabled={!finalBlob} className="text-xs font-bold py-2.5">
+                {copiedClipboard ? <CheckIcon size={15} className="text-emerald-500" /> : "📋"}
+                <span>{copiedClipboard ? "Tersalin!" : "Salin"}</span>
+              </GhostBtn>
+              <GhostBtn onClick={share} disabled={!finalBlob} className="text-xs font-bold py-2.5">
+                {shared ? <CheckIcon size={15} className="text-emerald-500" /> : <ShareIcon size={15} />}
+                <span>{shared ? "Tersimpan" : "Bagikan"}</span>
+              </GhostBtn>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <GhostBtn onClick={handleMakeGif} disabled={generatingGif} className="text-xs font-bold py-2 text-booth-accent border-booth-accent/40 bg-booth-accent/5">
+                {generatingGif ? <ClockIcon size={14} className="animate-spin" /> : "🎞️"}
+                <span>{generatingGif ? "Menyusun GIF…" : "Buat GIF Animasi"}</span>
+              </GhostBtn>
+              <GhostBtn onClick={() => setShowQr(true)} disabled={!finalBlob} className="text-xs font-bold py-2">
+                <span>📱 QR Unduh</span>
               </GhostBtn>
             </div>
             <div className="flex items-center justify-between px-1 text-xs">
@@ -495,6 +581,24 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
                 </p>
               </>
             )}
+
+            {/* Rasio Foto Adaptif */}
+            <div className="mt-3.5 pt-3 border-t border-booth-line/40 dark:border-booth-nightline/40">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-booth-muted dark:text-booth-creamdim block">
+                  Rasio Asli Foto
+                </label>
+                <span className="text-[10px] font-bold text-booth-accent">
+                  {PHOTO_RATIO_OPTIONS.find((r) => r.value === ratio)?.desc}
+                </span>
+              </div>
+              <Segmented
+                label="Pilih rasio foto"
+                value={ratio}
+                onChange={(v) => setRatio(v as PhotoRatio)}
+                options={PHOTO_RATIO_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
+              />
+            </div>
           </div>
 
           {/* Group 1: Template Selection */}
@@ -552,14 +656,28 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
 
           {/* Group 3: Primary Actions */}
           <div className="mt-auto pt-1 flex flex-col gap-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Btn tone="accent" onClick={download} disabled={!finalBlob} className="text-sm font-bold shadow-md">
                 <DownloadIcon size={16} />
-                Unduh Foto
+                Unduh
               </Btn>
+              <GhostBtn onClick={handleCopy} disabled={!finalBlob} className="text-sm font-bold">
+                {copiedClipboard ? <CheckIcon size={16} className="text-emerald-500" /> : "📋"}
+                <span>{copiedClipboard ? "Tersalin!" : "Salin Foto"}</span>
+              </GhostBtn>
               <GhostBtn onClick={share} disabled={!finalBlob} className="text-sm font-bold">
                 {shared ? <CheckIcon size={16} className="text-emerald-500" /> : <ShareIcon size={16} />}
-                {shared ? "Tersimpan" : "Bagikan"}
+                <span>{shared ? "Tersimpan" : "Bagikan"}</span>
+              </GhostBtn>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <GhostBtn onClick={handleMakeGif} disabled={generatingGif} className="text-xs font-bold py-2.5 text-booth-accent border-booth-accent/40 bg-booth-accent/5">
+                {generatingGif ? <ClockIcon size={14} className="animate-spin" /> : "🎞️"}
+                <span>{generatingGif ? "Menyusun GIF…" : "Buat GIF Animasi"}</span>
+              </GhostBtn>
+              <GhostBtn onClick={() => setShowQr(true)} disabled={!finalBlob} className="text-xs font-bold py-2.5">
+                📱 QR Unduh HP
               </GhostBtn>
             </div>
 
@@ -661,6 +779,24 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
           </div>
         </div>
       )}
+
+      {/* QR Code Modal for sharing/downloading */}
+      <QRCodeModal
+        isOpen={showQr}
+        onClose={() => setShowQr(false)}
+        value={typeof window !== "undefined" ? window.location.href : ""}
+        code={shots?.solo ? undefined : code}
+        title="Buka / Unduh di HP"
+        subtitle="Arahkan kamera HP temanmu ke sini untuk langsung membuka foto ini dan menyimpannya."
+      />
+
+      {/* Animated GIF Preview & Download Modal */}
+      <GifPreviewModal
+        isOpen={gifModalOpen}
+        onClose={() => setGifModalOpen(false)}
+        gifBlob={gifBlob}
+        code={code}
+      />
     </main>
   );
 }

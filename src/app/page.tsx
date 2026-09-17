@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { CameraTroubleshootModal } from "@/components/CameraTroubleshootModal";
 import { roomApi, RoomApiError } from "@/lib/room/api";
 import { validateDisplayName, normalizeCode, getSessionId } from "@/lib/room/session";
 import { saveRoomBundle } from "@/lib/room/bundle";
@@ -36,6 +38,7 @@ export default function Landing() {
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"create" | "join">("create");
+  const [showCameraHelp, setShowCameraHelp] = useState(false);
 
   const ensureSession = () => {
     try {
@@ -503,11 +506,31 @@ export default function Landing() {
       </main>
 
       {/* Clean Footer */}
-      <footer className="w-full border-t border-booth-line/60 py-6 text-center text-xs text-booth-muted dark:border-booth-nightline/60 dark:text-booth-creamdim">
-        <p>
-          Two-Person Photobooth · Dibuat dengan cinta untuk kamu & seseorang · Privasi terjaga, tanpa pelacakan
-        </p>
+      <footer className="w-full border-t border-booth-line/60 py-8 px-5 text-xs text-booth-muted dark:border-booth-nightline/60 dark:text-booth-creamdim">
+        <div className="mx-auto max-w-[1400px] flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <p>
+            Two-Person Photobooth · Dibuat dengan cinta untuk kamu & seseorang · Privasi terjaga, tanpa pelacakan
+          </p>
+          <div className="flex items-center gap-4 font-semibold">
+            <Link href="/privacy" className="hover:text-booth-ink dark:hover:text-white transition">
+              Kebijakan Privasi
+            </Link>
+            <span className="opacity-30">·</span>
+            <button
+              type="button"
+              onClick={() => setShowCameraHelp(true)}
+              className="hover:text-booth-ink dark:hover:text-white transition cursor-pointer"
+            >
+              Bantuan Izin Kamera
+            </button>
+          </div>
+        </div>
       </footer>
+
+      <CameraTroubleshootModal
+        isOpen={showCameraHelp}
+        onClose={() => setShowCameraHelp(false)}
+      />
     </div>
   );
 }

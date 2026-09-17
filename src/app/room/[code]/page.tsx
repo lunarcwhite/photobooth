@@ -14,6 +14,7 @@ import { Btn, GhostBtn, Field, Card, ErrorMsg, Dot, StepBadge } from "@/componen
 import { CameraView } from "@/components/CameraView";
 import { RemoteView } from "@/components/RemoteView";
 import { CheckIcon, ClockIcon, CopyIcon, MicIcon, MicOffIcon } from "@/components/icons";
+import { QRCodeModal } from "@/components/QRCodeModal";
 
 function initial(name: string): string {
   const t = name.trim();
@@ -35,6 +36,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
   const [bundle, setBundle] = useState<RoomBundle | null>(null);
   const [mounted, setMounted] = useState(false);
   const [shareLink, setShareLink] = useState(`/room/${code}`);
+  const [showQr, setShowQr] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -524,6 +526,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
               onCopyLink={copyLink}
               copied={copied}
               hasPartner={Boolean(partner)}
+              onShowQr={() => setShowQr(true)}
             />
           </div>
         </div>
@@ -583,6 +586,14 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
               >
                 {copied ? <CheckIcon size={14} className="text-emerald-500" /> : <CopyIcon size={14} />}
               </button>
+              <button
+                type="button"
+                onClick={() => setShowQr(true)}
+                className="flex h-8 px-2.5 shrink-0 items-center justify-center gap-1 rounded-xl border border-booth-line bg-booth-card text-xs font-semibold text-booth-ink hover:bg-black/[0.04] transition active:scale-95 dark:border-booth-nightline dark:bg-booth-nightcard dark:text-booth-cream cursor-pointer"
+                title="Tampilkan QR Code untuk dipindai kamera HP teman"
+              >
+                <span>📱 QR</span>
+              </button>
               {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
                 <button
                   type="button"
@@ -597,7 +608,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
               )}
             </div>
             <p className="mt-1 text-[10px] sm:text-[11px] text-booth-muted dark:text-booth-creamdim">
-              {copied ? "✓ Tautan berhasil disalin ke clipboard!" : "Kirim tautan ini ke temanmu via chat / medsos."}
+              {copied ? "✓ Tautan berhasil disalin ke clipboard!" : "Kirim tautan ini atau perlihatkan QR code ke temanmu."}
             </p>
           </div>
 
@@ -744,6 +755,15 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
           </div>
         </div>
       </div>
+      {/* Modal QR Code */}
+      <QRCodeModal
+        isOpen={showQr}
+        onClose={() => setShowQr(false)}
+        value={typeof window !== "undefined" ? window.location.href : shareLink}
+        code={code}
+        title="Masuk ke Bilik Foto"
+        subtitle="Arahkan kamera HP temanmu ke QR Code ini untuk langsung bergabung ke booth."
+      />
     </main>
   );
 }

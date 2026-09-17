@@ -114,15 +114,58 @@ export function usePeerCall({ myId, peerId, stream, isHost, send, enabled }: Arg
     }
   }, []);
 
+let dynamicIceServers: RTCIceServer[] | null = null;
+let dynamicIceFetched = false;
+
+// Pre-fetch dynamic ICE servers jika endpoint API disediakan (mis. Metered.ca)
+if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_TURN_API_URL && !dynamicIceFetched) {
+  dynamicIceFetched = true;
+  fetch(process.env.NEXT_PUBLIC_TURN_API_URL)
+    .then((res) => (res.ok ? res.json() : null))
+    .then((servers) => {
+      if (Array.isArray(servers) && servers.length > 0) {
+        dynamicIceServers = servers;
+        dbg("dynamic TURN servers loaded from API", servers.length);
+      }
+    })
+    .catch(() => {
+      /* fallback ke static credentials */
+    });
+}
+
+function getIceServers(): RTCIceServer[] {
+  if (dynamicIceServers && dynamicIceServers.length > 0) {
+    return dynamicIceServers;
+  }
+
+  const servers: RTCIceServer[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+  ];
+
+  // Konfigurasi TURN relay opsional (untuk jaringan seluler / symmetric NAT)
+  const turnUrl = process.env.NEXT_PUBLIC_TURN_URL;
+  const username = process.env.NEXT_PUBLIC_TURN_USERNAME;
+  const credential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
+
+  if (turnUrl) {
+    const urls = turnUrl.split(",").map((u) => u.trim());
+    servers.push({
+      urls,
+      username: username || undefined,
+      credential: credential || undefined,
+    });
+  }
+
+  return servers;
+}
+
   const makePc = useCallback(() => {
     dbg("makePc host=", isHostRef.current);
     pcRef.current?.close();
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-      ],
+      iceServers: getIceServers(),
     });
     pcRef.current = pc;
     const local = streamRef.current;

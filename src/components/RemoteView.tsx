@@ -18,6 +18,7 @@ export const RemoteView = memo(function RemoteView({
   onCopyLink,
   copied,
   hasPartner,
+  onShowQr,
 }: {
   remoteStream: MediaStream | null;
   status: CallStatus;
@@ -29,6 +30,7 @@ export const RemoteView = memo(function RemoteView({
   onCopyLink?: () => void;
   copied?: boolean;
   hasPartner?: boolean;
+  onShowQr?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const r = ratio ?? "3:4";
@@ -85,16 +87,28 @@ export const RemoteView = memo(function RemoteView({
               <div className="font-display text-base sm:text-2xl font-bold tracking-[0.15em] sm:tracking-[0.25em] text-booth-accent bg-black/50 px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-xl border border-white/10 tabular-nums shadow-inner">
                 {roomCode}
               </div>
-              {onCopyLink && (
-                <button
-                  type="button"
-                  onClick={onCopyLink}
-                  className="mt-0.5 sm:mt-1 inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/20 active:scale-95 transition cursor-pointer"
-                >
-                  {copied ? <CheckIcon size={14} className="text-emerald-400" /> : <CopyIcon size={14} />}
-                  <span>{copied ? "Tersalin!" : "Salin Link"}</span>
-                </button>
-              )}
+              <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5">
+                {onCopyLink && (
+                  <button
+                    type="button"
+                    onClick={onCopyLink}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/20 active:scale-95 transition cursor-pointer"
+                  >
+                    {copied ? <CheckIcon size={14} className="text-emerald-400" /> : <CopyIcon size={14} />}
+                    <span>{copied ? "Tersalin!" : "Salin Link"}</span>
+                  </button>
+                )}
+                {onShowQr && (
+                  <button
+                    type="button"
+                    onClick={onShowQr}
+                    title="Tampilkan QR Code untuk dipindai kamera HP teman"
+                    className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/20 active:scale-95 transition cursor-pointer"
+                  >
+                    <span>📱 QR</span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 sm:gap-2.5 w-full max-w-[240px] px-1">

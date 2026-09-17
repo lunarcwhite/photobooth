@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
+    "@types/qrcode": "^1.5.6",
+    "gifenc": "^1.0.3",
     "next": "16.3.4",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

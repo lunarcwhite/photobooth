@@ -10,6 +10,7 @@ import { Btn, GhostBtn, ErrorMsg, StepBadge, Segmented } from "@/components/ui";
 import { CameraView } from "@/components/CameraView";
 import { CameraIcon, CheckIcon, ClockIcon, RefreshIcon } from "@/components/icons";
 import { POSE_GUIDES } from "@/types/template";
+import { playCountdownBeep, playShutterSound, isSoundMuted, toggleSoundMute } from "@/lib/sound/effects";
 
 // Mode satu HP (PRD §5): satu kamera, berdua dalam satu bingkai,
 // 4 jepretan strip. Mendukung mode Otomatis dan Manual (tombol shutter)
@@ -43,6 +44,13 @@ export default function SamaPage() {
   const [shots, setShots] = useState<(string | null)[]>([null, null, null, null]);
   const [flash, setFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [soundMuted, setSoundMuted] = useState(false);
+  useEffect(() => {
+    setSoundMuted(isSoundMuted());
+  }, []);
+  const toggleSound = () => {
+    setSoundMuted(toggleSoundMute());
+  };
   const [finishing, setFinishing] = useState(false);
 
   // Sync refs to avoid stale closures in async/timeout callbacks
@@ -69,6 +77,7 @@ export default function SamaPage() {
       setIsCountingDown(false);
       setFlash(true);
       setTimeout(() => setFlash(false), 180);
+      playShutterSound();
 
       try {
         const blob = await cam.captureShot();
@@ -122,6 +131,15 @@ export default function SamaPage() {
     // count === 0: waktu habis, jepret foto!
     void executeCapture(shotIndexRef.current);
   }, [phase, cameraReady, isCountingDown, count, isCapturing, executeCapture]);
+
+  // Bunyi beep hitung mundur
+  const lastCountRef = useRef<number>(0);
+  useEffect(() => {
+    if (isCountingDown && count > 0 && count !== lastCountRef.current && count <= 3) {
+      playCountdownBeep(count === 1);
+    }
+    lastCountRef.current = count;
+  }, [count, isCountingDown]);
 
   // Handler memicu jepretan di mode manual
   const triggerManualShot = useCallback(() => {
@@ -253,6 +271,15 @@ export default function SamaPage() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleSound}
+            title={soundMuted ? "Bunyikan hitung mundur & kamera" : "Bisukan suara"}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-booth-line bg-booth-card/60 text-xs font-semibold text-booth-muted hover:text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:bg-booth-nightcard/60 dark:text-booth-creamdim dark:hover:text-white cursor-pointer"
+          >
+            {soundMuted ? "🔇" : "🔊"}
+          </button>
+
           {/* Progress Indicator */}
           <div
             className="flex items-center gap-1.5 rounded-xl border border-booth-line bg-booth-card/60 px-2.5 py-1 sm:px-3.5 sm:py-1.5 dark:border-booth-nightline dark:bg-booth-nightcard/60"

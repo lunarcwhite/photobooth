@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Geist } from "next/font/google";
 import "./globals.css";
 
@@ -14,9 +14,58 @@ const bodyFont = Geist({
   weight: ["400", "500", "600", "700"],
 });
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F4EE" },
+    { media: "(prefers-color-scheme: dark)", color: "#171310" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "Booth Kecil untuk Berdua — Tanpa Aplikasi, Tanpa Daftar",
-  description: "Photobooth browser untuk dua orang: remote dua HP atau satu HP bareng. Hitung mundur sinkron, hasil siap diunduh.",
+  metadataBase: new URL(appUrl),
+  title: {
+    default: "Booth Kecil untuk Berdua — Photobooth Online Tanpa Aplikasi",
+    template: "%s | Booth Kecil",
+  },
+  description:
+    "Photobooth online gratis untuk dua orang: remote dua HP berjauhan atau satu HP bareng. Hitung mundur sinkron, hasil foto estetik siap unduh.",
+  keywords: [
+    "photobooth online",
+    "photobooth berdua",
+    "photostrip",
+    "booth foto ldr",
+    "photobooth web",
+    "life four cuts online",
+  ],
+  authors: [{ name: "Booth Kecil" }],
+  openGraph: {
+    title: "Booth Kecil untuk Berdua — Photobooth Online Tanpa Aplikasi",
+    description:
+      "Bikin foto strip estetik bareng teman atau pasangan dari mana saja. Tanpa unduh aplikasi, tanpa daftar akun.",
+    url: appUrl,
+    siteName: "Booth Kecil",
+    locale: "id_ID",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Booth Kecil untuk Berdua — Photobooth Online Tanpa Aplikasi",
+    description:
+      "Bikin foto strip estetik bareng teman atau pasangan dari mana saja. Tanpa unduh aplikasi, tanpa daftar akun.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

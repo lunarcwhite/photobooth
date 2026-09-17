@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase/client";
 import { roomApi } from "@/lib/room/api";
 import { AlertIcon, BackIcon, CameraIcon, CheckIcon, ClockIcon, MicIcon, MicOffIcon } from "@/components/icons";
 import { POSE_GUIDES } from "@/types/template";
+import { playCountdownBeep, playShutterSound, isSoundMuted, toggleSoundMute } from "@/lib/sound/effects";
 
 // Capture otomatis: jadwal 4 targetTimes jam server dari room-api.start.
 // Host: after session_started kirim mismo ke guest. Guest: bundle lama
@@ -61,6 +62,13 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   const [armedShot, setArmedShot] = useState<{ sequence: number; targetAt: number } | null>(null);
 
   const [flash, setFlash] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(false);
+  useEffect(() => {
+    setSoundMuted(isSoundMuted());
+  }, []);
+  const toggleSound = () => {
+    setSoundMuted(toggleSoundMute());
+  };
   const [myShots, setMyShots] = useState<(string | null)[]>([null, null, null, null]);
   const [partnerPaths, setPartnerPaths] = useState<(string | null)[]>([null, null, null, null]);
   const [partnerId, setPartnerId] = useState<string | null>(null);
@@ -346,6 +354,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       // Shutter flash langsung — umpan balik fisik booth (DESIGN §8).
       setFlash(true);
       setTimeout(() => setFlash(false), 180);
+      playShutterSound();
       try {
         const blob = await cam.captureShot();
         const url = await blobToDataURL(blob);
@@ -405,6 +414,15 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
       : captureMode === "manual" && armedShot
         ? Math.max(0, Math.ceil((armedShot.targetAt - now) / 1000))
         : 0;
+
+  // Bunyi hitung mundur saat detik berubah (3, 2, 1)
+  const lastCountdownRef = useRef<number>(0);
+  useEffect(() => {
+    if (countdown > 0 && countdown !== lastCountdownRef.current && countdown <= 3) {
+      playCountdownBeep(countdown === 1);
+    }
+    lastCountdownRef.current = countdown;
+  }, [countdown]);
 
   // Aksi Shutter Manual oleh Host
   const triggerManualShot = useCallback(async () => {
@@ -591,6 +609,14 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleSound}
+            title={soundMuted ? "Bunyikan hitung mundur & kamera" : "Bisukan suara"}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-booth-line bg-booth-card/60 text-xs font-semibold text-booth-muted hover:text-booth-ink hover:bg-black/[0.04] transition dark:border-booth-nightline dark:bg-booth-nightcard/60 dark:text-booth-creamdim dark:hover:text-white cursor-pointer"
+          >
+            {soundMuted ? "🔇" : "🔊"}
+          </button>
           {uploading && (
             <span className="text-xs font-semibold text-booth-muted dark:text-booth-creamdim animate-pulse">
               Mengunggah foto…

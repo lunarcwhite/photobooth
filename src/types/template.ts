@@ -18,6 +18,14 @@ export interface TemplateConfig {
   grain?: number;
 }
 
+export type PhotoRatio = "3:4" | "1:1" | "9:16";
+
+export const PHOTO_RATIO_OPTIONS: { value: PhotoRatio; label: string; desc: string }[] = [
+  { value: "3:4", label: "3:4", desc: "Potret Klasik" },
+  { value: "1:1", label: "1:1", desc: "Kotak Persegi" },
+  { value: "9:16", label: "9:16", desc: "Vertikal Penuh" },
+];
+
 export type SoloLayout = "single" | "twin" | "grid2x2";
 
 export const SOLO_LAYOUTS: { value: SoloLayout; label: string; desc: string }[] = [
@@ -177,7 +185,7 @@ export const TEMPLATES: [TemplateConfig, TemplateConfig, TemplateConfig, Templat
 ];
 
 export type PhotoStyle = "original" | "warm" | "bw" | "vintage";
-export type PhotoDecor = "none" | "sparkle" | "tape";
+export type PhotoDecor = "none" | "sparkle" | "ribbon" | "hearts" | "cats" | "tape";
 
 export const PHOTO_STYLES: { value: PhotoStyle; label: string }[] = [
   { value: "original", label: "Asli" },
@@ -188,6 +196,9 @@ export const PHOTO_STYLES: { value: PhotoStyle; label: string }[] = [
 
 export const PHOTO_DECORS: { value: PhotoDecor; label: string }[] = [
   { value: "none", label: "Polos" },
-  { value: "sparkle", label: "Sparkle" },
+  { value: "sparkle", label: "✨ Sparkle" },
+  { value: "ribbon", label: "🎀 Pita" },
+  { value: "hearts", label: "💖 Hati" },
+  { value: "cats", label: "🐾 Kucing" },
   { value: "tape", label: "Tape" },
 ];

@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import type { PhotoRatio } from "@/hooks/useCamera";
 import { IconBtn, Btn } from "@/components/ui";
 import { CameraIcon, LockIcon, MirrorIcon } from "@/components/icons";
+import { CameraTroubleshootModal } from "@/components/CameraTroubleshootModal";
 
 // Local preview. File output always matches preview (center crop in captureShot).
 // memo: parent ticks `now` 1–10x/detik — video element must not re-render on tick.
@@ -30,6 +31,7 @@ export const CameraView = memo(function CameraView({
   onStartCamera?: () => void;
   message?: string | null;
 }) {
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
   const r = ratio ?? "3:4";
   // Two-dimensional fit via container query: width = min(100%, cell height x ratio).
   const size =
@@ -82,17 +84,30 @@ export const CameraView = memo(function CameraView({
               {message ?? "Izinkan akses kamera untuk melangkah masuk ke booth"}
             </p>
           </div>
-          {onStartCamera && (
-            <Btn
-              tone="accent"
-              onClick={onStartCamera}
-              className="mt-0.5 sm:mt-1 min-h-[36px] sm:min-h-[42px] w-auto px-3.5 sm:px-5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold shadow-lg"
+          <div className="flex flex-col items-center gap-1.5 mt-0.5 sm:mt-1">
+            {onStartCamera && (
+              <Btn
+                tone="accent"
+                onClick={onStartCamera}
+                className="min-h-[36px] sm:min-h-[42px] w-auto px-3.5 sm:px-5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold shadow-lg"
+              >
+                Aktifkan Kamera
+              </Btn>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowTroubleshoot(true)}
+              className="text-[10px] sm:text-[11px] font-semibold text-white/70 hover:text-white underline underline-offset-2 transition cursor-pointer py-0.5"
             >
-              Aktifkan Kamera
-            </Btn>
-          )}
+              Kamera diblokir? Bantuan izin
+            </button>
+          </div>
         </div>
       )}
+      <CameraTroubleshootModal
+        isOpen={showTroubleshoot}
+        onClose={() => setShowTroubleshoot(false)}
+      />
       <div className="absolute top-2 left-2 sm:top-3 sm:left-3 rounded-lg bg-black/75 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-bold tracking-wider text-white backdrop-blur-xs flex items-center gap-1.5 shadow-sm max-w-[70%] truncate">
         <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${ready ? "bg-emerald-400" : "bg-amber-400"}`} />
         <span className="truncate">{label}</span>

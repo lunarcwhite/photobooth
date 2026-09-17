@@ -135,7 +135,7 @@ export const CameraView = memo(function CameraView({
   };
 
   return (
-    <div className={`relative ${size} max-h-full max-w-full shrink-0 overflow-hidden rounded-2xl border-2 border-booth-line bg-booth-night shadow-print dark:border-booth-nightline`}>
+    <div className={`relative ${size} max-h-full max-w-full shrink-0 overflow-hidden rounded-2xl border-2 border-booth-line bg-slate-950 shadow-print dark:border-booth-nightline`}>
       <video
         ref={videoRef}
         autoPlay
@@ -150,31 +150,31 @@ export const CameraView = memo(function CameraView({
         className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${mirrored ? "scale-x-[-1]" : ""}`}
       />
       {!ready && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 p-3 sm:p-6 text-center bg-booth-night text-booth-creamdim z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 p-3 sm:p-6 text-center bg-slate-950 text-slate-300 z-10">
           <div className="flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl sm:rounded-2xl bg-white/10 text-white shadow-inner">
             <CameraIcon size={20} className="sm:hidden" />
             <CameraIcon size={28} className="hidden sm:block" />
           </div>
           <div className="w-full max-w-[240px] px-1">
             <p className="font-display text-sm sm:text-lg font-bold text-white tracking-wide">Kamera Belum Aktif</p>
-            <p className="text-[11px] sm:text-xs text-white/60 mt-0.5 sm:mt-1 leading-snug">
+            <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug">
               {message ?? "Izinkan akses kamera untuk melangkah masuk ke booth"}
             </p>
           </div>
           <div className="flex flex-col items-center gap-1.5 mt-0.5 sm:mt-1">
             {onStartCamera && (
-              <Btn
-                tone="accent"
+              <button
+                type="button"
                 onClick={onStartCamera}
-                className="min-h-[36px] sm:min-h-[42px] w-auto px-3.5 sm:px-5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold shadow-lg"
+                className="min-h-[36px] sm:min-h-[42px] w-auto px-4 sm:px-6 py-1.5 sm:py-2 rounded-xl bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs sm:text-sm shadow-lg active:scale-95 transition cursor-pointer"
               >
                 Aktifkan Kamera
-              </Btn>
+              </button>
             )}
             <button
               type="button"
               onClick={() => setShowTroubleshoot(true)}
-              className="text-[10px] sm:text-[11px] font-semibold text-white/70 hover:text-white underline underline-offset-2 transition cursor-pointer py-0.5"
+              className="text-[10px] sm:text-[11px] font-semibold text-slate-400 hover:text-white underline underline-offset-2 transition cursor-pointer py-0.5"
             >
               Kamera diblokir? Bantuan izin
             </button>

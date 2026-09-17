@@ -63,7 +63,7 @@ export const RemoteView = memo(function RemoteView({
   const showVideo = remoteStream !== null && status === "connected";
 
   return (
-    <div className={`relative ${size} max-h-full max-w-full shrink-0 overflow-hidden rounded-2xl border-2 border-booth-line bg-booth-night shadow-print dark:border-booth-nightline`}>
+    <div className={`relative ${size} max-h-full max-w-full shrink-0 overflow-hidden rounded-2xl border-2 border-booth-line bg-slate-950 shadow-print dark:border-booth-nightline`}>
       <video
         ref={ref}
         autoPlay
@@ -73,18 +73,18 @@ export const RemoteView = memo(function RemoteView({
         className={`h-full w-full cursor-pointer object-cover ${showVideo ? "" : "hidden"}`}
       />
       {!showVideo && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 p-3 sm:p-6 text-center text-booth-creamdim z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 p-3 sm:p-6 text-center text-slate-300 z-10 bg-slate-950">
           {!hasPartner && roomCode ? (
             <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 w-full max-w-[260px] px-1">
-              <div className="flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl sm:rounded-2xl border border-dashed border-white/25 text-white/60 bg-white/5">
+              <div className="flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl sm:rounded-2xl border border-dashed border-white/30 text-white/80 bg-white/10">
                 <UserIcon size={18} className="sm:hidden" />
                 <UserIcon size={26} className="hidden sm:block" />
               </div>
               <div>
                 <p className="font-display text-sm sm:text-xl font-bold text-white tracking-wide">Menunggu Teman</p>
-                <p className="text-[10px] sm:text-xs text-white/60 mt-0.5 sm:mt-1">Bagikan kode booth ini:</p>
+                <p className="text-[10px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1">Bagikan kode booth ini:</p>
               </div>
-              <div className="font-display text-base sm:text-2xl font-bold tracking-[0.15em] sm:tracking-[0.25em] text-booth-accent bg-black/50 px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-xl border border-white/10 tabular-nums shadow-inner">
+              <div className="font-display text-base sm:text-2xl font-bold tracking-[0.18em] sm:tracking-[0.25em] text-white bg-white/15 px-4 py-1.5 sm:px-6 sm:py-2 rounded-xl border border-white/25 tabular-nums shadow-inner">
                 {roomCode}
               </div>
               <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5">
@@ -92,7 +92,7 @@ export const RemoteView = memo(function RemoteView({
                   <button
                     type="button"
                     onClick={onCopyLink}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/20 active:scale-95 transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/25 active:scale-95 transition cursor-pointer"
                   >
                     {copied ? <CheckIcon size={14} className="text-emerald-400" /> : <CopyIcon size={14} />}
                     <span>{copied ? "Tersalin!" : "Salin Link"}</span>
@@ -103,7 +103,7 @@ export const RemoteView = memo(function RemoteView({
                     type="button"
                     onClick={onShowQr}
                     title="Tampilkan QR Code untuk dipindai kamera HP teman"
-                    className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/20 active:scale-95 transition cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-xl border border-white/25 bg-white/15 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-white/25 active:scale-95 transition cursor-pointer"
                   >
                     <span>📱 QR</span>
                   </button>

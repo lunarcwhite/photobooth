@@ -624,7 +624,7 @@ export default function SamaPage() {
         </div>
 
         {/* Desktop Sidebar Console & Controls Panel (md: and up) */}
-        <div className="hidden md:flex shrink-0 flex-col gap-2.5 md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-80 lg:overflow-visible">
+        <div className="hidden md:flex shrink-0 flex-col gap-2.5 md:min-h-0 md:w-64 md:justify-start md:overflow-y-auto lg:w-80 scrollbar-thin">
           {/* Live Filter Selector on Desktop */}
           {phase !== "done" && (
             <div className="booth-card rounded-2xl p-2.5 sm:p-3">

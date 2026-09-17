@@ -605,7 +605,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
   return (
     <main className="flex h-dvh w-full flex-col gap-2 overflow-hidden px-3 py-2 sm:px-4 sm:py-3 md:gap-3 md:px-8 lg:gap-4 lg:px-12 xl:mx-auto xl:max-w-[1500px] xl:px-14">
       {/* Top Bar Header */}
-      <header className="flex shrink-0 items-center justify-between gap-2.5 border-b border-booth-line/60 pb-2 dark:border-booth-nightline/60">
+      <header className="relative z-20 flex shrink-0 items-center justify-between gap-2.5 border-b border-booth-line/60 pb-2 dark:border-booth-nightline/60">
         <div className="flex items-center gap-2 min-w-0">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -624,19 +624,30 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Audio Mic Mute Toggle */}
-          {cameraReady && cam.audioOn && (
-            <button
-              type="button"
-              onClick={cam.toggleMute}
-              title={cam.muted ? "Nyalakan mic" : "Bisukan mic"}
-              className={`flex h-8 w-8 items-center justify-center rounded-xl border transition cursor-pointer ${
-                cam.muted
-                  ? "border-red-400/50 bg-red-500/10 text-red-500 hover:bg-red-500/20 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-400"
-                  : "border-booth-line bg-booth-card/60 text-emerald-600 hover:bg-black/[0.04] dark:border-booth-nightline dark:bg-booth-nightcard/60 dark:text-emerald-400"
-              }`}
-            >
-              {cam.muted ? <MicOffIcon size={16} /> : <MicIcon size={16} />}
-            </button>
+          {cameraReady && (
+            cam.audioOn ? (
+              <button
+                type="button"
+                onClick={cam.toggleMute}
+                title={cam.muted ? "Nyalakan mic" : "Bisukan mic"}
+                className={`flex h-8 items-center gap-1.5 px-2.5 rounded-xl border transition cursor-pointer text-xs font-semibold ${
+                  cam.muted
+                    ? "border-red-400/50 bg-red-500/10 text-red-500 hover:bg-red-500/20 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-400"
+                    : "border-booth-line bg-booth-card/60 text-emerald-600 hover:bg-black/[0.04] dark:border-booth-nightline dark:bg-booth-nightcard/60 dark:text-emerald-400"
+                }`}
+              >
+                {cam.muted ? <MicOffIcon size={15} /> : <MicIcon size={15} />}
+                <span className="hidden sm:inline">{cam.muted ? "Mic Bisu" : "Mic Aktif"}</span>
+              </button>
+            ) : (
+              <div
+                title="Mikrofon tidak terdeteksi atau tidak aktif"
+                className="flex h-8 items-center gap-1 px-2.5 rounded-xl border border-booth-line/50 bg-black/[0.02] text-[11px] font-medium text-booth-muted dark:border-booth-nightline/50 dark:text-booth-creamdim"
+              >
+                <MicOffIcon size={14} className="opacity-50" />
+                <span className="hidden sm:inline">Tanpa Mic</span>
+              </div>
+            )
           )}
 
           {/* Sound Toggle */}
@@ -894,7 +905,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
         </div>
 
         {/* Desktop Sidebar Console (md: and up, generous layout) */}
-        <div className="hidden md:flex shrink-0 flex-col gap-2.5 sm:gap-3 md:min-h-0 md:w-64 md:justify-center md:overflow-y-auto lg:w-76 lg:overflow-visible">
+        <div className="hidden md:flex shrink-0 flex-col gap-2 md:min-h-0 md:w-72 lg:w-80 justify-start overflow-y-auto pr-0.5 scrollbar-thin">
           {/* Live Filter Selector on Desktop */}
           {!allDone && (
             <div className="booth-card rounded-2xl p-2.5 sm:p-3">
@@ -933,9 +944,9 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
             </div>
           )}
 
-          {/* Filmstrip Card */}
-          <div className="booth-card rounded-2xl p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+          {/* Filmstrip Card: Compact 4-col photobooth strip */}
+          <div className="booth-card rounded-2xl p-2.5 sm:p-3">
+            <div className="flex items-center justify-between mb-1.5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-booth-muted dark:text-booth-creamdim">
                 Strip Foto ({doneCount}/4)
               </p>
@@ -944,7 +955,7 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 lg:gap-2.5">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
               {[0, 1, 2, 3].map((i) => {
                 const ar = cam.ratio === "1:1" ? "aspect-square" : cam.ratio === "9:16" ? "aspect-[9/16]" : "aspect-[3/4]";
                 const done = shots[i].done;
@@ -953,11 +964,11 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 return (
                   <div key={i} className="flex flex-col items-center">
                     <div
-                      className={`relative w-full ${ar} overflow-hidden rounded-xl border-2 transition-all duration-200 bg-booth-night shadow-sm ${
+                      className={`relative w-full ${ar} max-h-20 overflow-hidden rounded-xl border-2 transition-all duration-200 bg-booth-night shadow-sm ${
                         done
                           ? "border-emerald-500 shadow-emerald-500/10"
                           : isActive
-                            ? "border-booth-accent ring-2 ring-booth-accent/30"
+                            ? "border-booth-accent ring-2 ring-booth-accent/30 scale-105"
                             : "border-booth-line/70 dark:border-booth-nightline/70"
                       }`}
                     >
@@ -971,28 +982,28 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-white/40" aria-hidden>
                           {isActive ? (
-                            <CameraIcon size={20} className="text-booth-accent animate-pulse" />
+                            <CameraIcon size={16} className="text-booth-accent animate-pulse" />
                           ) : (
-                            <span className="text-xs font-bold tabular-nums">#{i + 1}</span>
+                            <span className="text-[10px] font-bold tabular-nums">#{i + 1}</span>
                           )}
                         </div>
                       )}
 
                       {done && (
-                        <span className="absolute right-1.5 bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs" aria-hidden>
-                          <CheckIcon size={12} strokeWidth={2.5} />
+                        <span className="absolute right-1 bottom-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs" aria-hidden>
+                          <CheckIcon size={10} strokeWidth={2.5} />
                         </span>
                       )}
 
                       {isActive && !done && (
                         <span className="absolute inset-0 flex items-center justify-center bg-black/40">
-                          <span key={countdown} className="countdown-num font-display text-2xl font-bold text-white tabular-nums">
+                          <span key={countdown} className="countdown-num font-display text-base font-bold text-white tabular-nums">
                             {countdown > 0 ? countdown : "✦"}
                           </span>
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] font-semibold text-booth-muted dark:text-booth-creamdim mt-1 tabular-nums">
+                    <span className="text-[9px] font-semibold text-booth-muted dark:text-booth-creamdim mt-1 tabular-nums">
                       Foto {i + 1}
                     </span>
                   </div>
@@ -1062,6 +1073,22 @@ export default function CapturePage({ params }: { params: Promise<{ code: string
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Audio Mic Mute in Desktop Sidebar Console */}
+          {cameraReady && cam.audioOn && (
+            <button
+              type="button"
+              onClick={cam.toggleMute}
+              className={`flex min-h-[38px] w-full shrink-0 items-center justify-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition active:translate-y-px cursor-pointer ${
+                cam.muted
+                  ? "border-red-400/50 bg-red-500/10 text-red-500 hover:bg-red-500/20 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-400"
+                  : "border-booth-line bg-booth-card text-emerald-600 hover:bg-black/[0.04] dark:border-booth-nightline dark:bg-booth-nightcard dark:text-emerald-400"
+              }`}
+            >
+              {cam.muted ? <MicOffIcon size={15} className="text-red-500" /> : <MicIcon size={15} className="text-emerald-500" />}
+              <span>{cam.muted ? "Mikrofon Bisu (Ketuk untuk Bicara)" : "Mikrofon Aktif (Bisa Mengobrol)"}</span>
+            </button>
           )}
 
           {/* Selesai / Action Console */}

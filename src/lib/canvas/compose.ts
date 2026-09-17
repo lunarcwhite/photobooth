@@ -18,7 +18,7 @@ function drawCover(
   w: number,
   h: number,
   style: PhotoStyle,
-  cropTopBias = 0.18,
+  cropTopBias = 0.28,
 ) {
   const off = document.createElement("canvas");
   off.width = Math.round(w);
@@ -101,11 +101,19 @@ export async function composeFinal(
     if (soloLayout === "twin") {
       // ✂️ LAYOUT STRIP KEMBAR (Twin Strip 2 Lembar untuk Berdua)
       // Strip Kiri (x: 0..540) & Strip Kanan (x: 540..1080)
+      let slotW: number;
       const slotH = 355;
-      const slotW = 450;
+      if (ratio === "1:1") {
+        slotW = 355;
+      } else if (ratio === "9:16") {
+        slotW = 460;
+      } else {
+        // 3:4
+        slotW = 420;
+      }
       const slotY = [160, 540, 920, 1300];
-      const leftX = 45;
-      const rightX = 585;
+      const leftX = Math.round(270 - slotW / 2);
+      const rightX = Math.round(810 - slotW / 2);
 
       // Judul masing-masing strip
       ctx.fillStyle = dark ? "#ffffff" : "#111111";
@@ -119,10 +127,10 @@ export async function composeFinal(
         const img = rawImages[i];
         const y = slotY[i];
         // Strip Kiri
-        if (img) drawCover(ctx, img, leftX, y, slotW, slotH, style, 0.18);
+        if (img) drawCover(ctx, img, leftX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, leftX, y, slotW, slotH);
         // Strip Kanan
-        if (img) drawCover(ctx, img, rightX, y, slotW, slotH, style, 0.18);
+        if (img) drawCover(ctx, img, rightX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, rightX, y, slotW, slotH);
       }
 
@@ -286,10 +294,23 @@ export async function composeFinal(
       ctx.font = `700 52px Georgia, serif`;
       ctx.fillText(tpl.text.title, tpl.width / 2, 115);
 
-      const slotH = 360;
-      const slotW = 760;
+      let slotW: number;
+      let slotH = 365;
+      let slotY = [160, 545, 930, 1315];
+
+      if (ratio === "1:1") {
+        slotW = 365;
+        slotH = 365;
+      } else if (ratio === "9:16") {
+        slotW = 760;
+        slotH = 360;
+        slotY = [160, 545, 930, 1315];
+      } else {
+        // 3:4
+        slotW = 540;
+        slotH = 365;
+      }
       const slotX = Math.round((tpl.width - slotW) / 2);
-      const slotY = [160, 545, 930, 1315];
 
       for (let i = 0; i < 4; i++) {
         const img = rawImages[i];
@@ -298,7 +319,7 @@ export async function composeFinal(
         ctx.beginPath();
         ctx.roundRect(slotX, y, slotW, slotH, 16);
         ctx.clip();
-        if (img) drawCover(ctx, img, slotX, y, slotW, slotH, style, 0.18);
+        if (img) drawCover(ctx, img, slotX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, slotX, y, slotW, slotH);
         ctx.restore();
 
@@ -354,11 +375,22 @@ export async function composeFinal(
 
       const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
 
-      // 4 Baris Horizontal Lebar yang menyatukan kedua orang (proporsional memenuhi frame)
-      const rowW = 960;
-      const rowH = 360;
+      // 4 Baris Horizontal Lebar yang menyatukan kedua orang (proporsional memenuhi frame sesuai rasio)
+      let halfW: number;
+      let rowH = 360;
+      if (ratio === "1:1") {
+        halfW = 360;
+        rowH = 360;
+      } else if (ratio === "9:16") {
+        halfW = 480;
+        rowH = 355;
+      } else {
+        // 3:4
+        halfW = 440;
+        rowH = 360;
+      }
+      const rowW = halfW * 2;
       const startX = Math.round((tpl.width - rowW) / 2);
-      const halfW = rowW / 2;
       const rowY = [160, 545, 930, 1315];
       const cornerR = 20;
 
@@ -374,11 +406,11 @@ export async function composeFinal(
         ctx.clip();
 
         // Host (kiri)
-        if (hostImg) drawCover(ctx, hostImg, startX, y, halfW, rowH, style, 0.18);
+        if (hostImg) drawCover(ctx, hostImg, startX, y, halfW, rowH, style, 0.28);
         else placeholder(ctx, startX, y, halfW, rowH);
 
         // Guest (kanan) - menyatu rapat di tengah!
-        if (guestImg) drawCover(ctx, guestImg, startX + halfW, y, halfW, rowH, style, 0.18);
+        if (guestImg) drawCover(ctx, guestImg, startX + halfW, y, halfW, rowH, style, 0.28);
         else placeholder(ctx, startX + halfW, y, halfW, rowH);
 
         // Garis batas sambungan tengah yang halus
@@ -419,11 +451,19 @@ export async function composeFinal(
       }
     } else if (remoteLayout === "twin") {
       // ✂️ STRIP KEMBAR DUO (Strip Host di Kiri, Strip Guest di Kanan)
+      let slotW: number;
       const slotH = 355;
-      const slotW = 450;
+      if (ratio === "1:1") {
+        slotW = 355;
+      } else if (ratio === "9:16") {
+        slotW = 460;
+      } else {
+        // 3:4
+        slotW = 420;
+      }
       const slotY = [160, 540, 920, 1300];
-      const leftX = 45;
-      const rightX = 585;
+      const leftX = Math.round(270 - slotW / 2);
+      const rightX = Math.round(810 - slotW / 2);
 
       const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
 
@@ -438,10 +478,10 @@ export async function composeFinal(
         const guestImg = images[i * 2 + 1];
         const y = slotY[i];
 
-        if (hostImg) drawCover(ctx, hostImg, leftX, y, slotW, slotH, style, 0.18);
+        if (hostImg) drawCover(ctx, hostImg, leftX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, leftX, y, slotW, slotH);
 
-        if (guestImg) drawCover(ctx, guestImg, rightX, y, slotW, slotH, style, 0.18);
+        if (guestImg) drawCover(ctx, guestImg, rightX, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, rightX, y, slotW, slotH);
       }
 
@@ -490,10 +530,24 @@ export async function composeFinal(
       ctx.font = `700 54px Georgia, serif`;
       ctx.fillText(tpl.text.title, tpl.width / 2, 100);
 
+      let slotW: number;
       const slotH = 360;
-      const slotW = 460;
-      const col1X = 55;
-      const col2X = 565;
+      let col1X: number;
+      let col2X: number;
+      if (ratio === "1:1") {
+        slotW = 360;
+        col1X = 140;
+        col2X = 580;
+      } else if (ratio === "9:16") {
+        slotW = 470;
+        col1X = 45;
+        col2X = 565;
+      } else {
+        // 3:4
+        slotW = 440;
+        col1X = 70;
+        col2X = 570;
+      }
       const rowY = [160, 545, 930, 1315];
 
       const images = await Promise.all(slots.slice(0, 8).map((s) => imageFromURL(s ?? "")));
@@ -503,7 +557,7 @@ export async function composeFinal(
         const isCol2 = i % 2 === 1;
         const x = isCol2 ? col2X : col1X;
         const y = rowY[rowIdx];
-        if (img) drawCover(ctx, img, x, y, slotW, slotH, style, 0.18);
+        if (img) drawCover(ctx, img, x, y, slotW, slotH, style, 0.28);
         else placeholder(ctx, x, y, slotW, slotH);
       }
 

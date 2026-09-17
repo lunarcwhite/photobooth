@@ -33,7 +33,7 @@ jobs:
 
       - name: Test Production Build
         env:
-          NEXT_PUBLIC_APP_URL: https://photobooth.vercel.app
+          NEXT_PUBLIC_APP_URL: https://photobooth-five-virid.vercel.app
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
         run: npm run build

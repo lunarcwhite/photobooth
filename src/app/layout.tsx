@@ -14,7 +14,7 @@ const bodyFont = Geist({
   weight: ["400", "500", "600", "700"],
 });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://photobooth-five-virid.vercel.app";
 
 export const viewport: Viewport = {
   themeColor: [

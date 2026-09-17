@@ -205,7 +205,7 @@ export default async function Image() {
                 marginTop: "2px",
               }}
             >
-              boothkecil.vercel.app
+              photobooth-five-virid.vercel.app
             </span>
           </div>
         </div>

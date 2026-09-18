@@ -202,3 +202,18 @@ export const PHOTO_DECORS: { value: PhotoDecor; label: string }[] = [
   { value: "cats", label: "🐾 Kucing" },
   { value: "tape", label: "Tape" },
 ];
+
+export type PhotoBackground = "none" | "corkboard" | "studio" | "wood";
+
+export interface PhotoBackgroundOption {
+  value: PhotoBackground;
+  label: string;
+  desc: string;
+}
+
+export const PHOTO_BACKGROUND_OPTIONS: PhotoBackgroundOption[] = [
+  { value: "none", label: "🚫 Tanpa Latar", desc: "Strip murni siap potong & cetak fisik" },
+  { value: "corkboard", label: "📌 Papan Memo", desc: "Meja kayu & papan corkboard (seperti preview cetak)" },
+  { value: "studio", label: "🌿 Studio Minimal", desc: "Kain linen estetik dengan bayangan jendela" },
+  { value: "wood", label: "☕ Meja Kafe", desc: "Meja kayu rustic hangat bergaya kafe" },
+];

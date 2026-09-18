@@ -1,9 +1,10 @@
-import type { PhotoDecor, PhotoRatio, PhotoStyle, RemoteLayout, SoloLayout, TemplateConfig } from "@/types/template";
+import type { PhotoBackground, PhotoDecor, PhotoRatio, PhotoStyle, RemoteLayout, SoloLayout, TemplateConfig } from "@/types/template";
 
 export function imageFromURL(url: string): Promise<HTMLImageElement | null> {
   if (!url) return Promise.resolve(null);
   return new Promise((resolve) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = url;
@@ -82,6 +83,7 @@ export async function composeFinal(
     soloLayout?: SoloLayout;
     remoteLayout?: RemoteLayout;
     ratio?: PhotoRatio;
+    background?: PhotoBackground;
   },
 ): Promise<Blob> {
   const style = opts.style ?? "original";
@@ -91,6 +93,7 @@ export async function composeFinal(
   const soloLayout: SoloLayout = opts.soloLayout ?? "single";
   const remoteLayout: RemoteLayout = opts.remoteLayout ?? "seamless";
   const ratio: PhotoRatio = opts.ratio ?? "3:4";
+  const background: PhotoBackground = opts.background ?? "none";
 
   let canvasW = 1080;
   let canvasH = 1920;
@@ -217,7 +220,7 @@ export async function composeFinal(
       renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
       renderGrain(ctx, canvasW, canvasH, tpl.grain);
 
-      return canvasToBlob(canvas);
+      return canvasToBlob(await applyBackgroundMockup(canvas, background));
     } else if (soloLayout === "grid2x2") {
       // 🖼️ LAYOUT GRID 2x2 (Poster Polaroid Kotak Modern)
       canvasW = 1080;
@@ -328,7 +331,7 @@ export async function composeFinal(
       renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
       renderGrain(ctx, canvasW, canvasH, tpl.grain);
 
-      return canvasToBlob(canvas);
+      return canvasToBlob(await applyBackgroundMockup(canvas, background));
     } else {
       // ✂️ LAYOUT STRIP KEMBAR (Twin Strip 2 Lembar untuk Berdua)
       canvasW = 1080;
@@ -455,7 +458,7 @@ export async function composeFinal(
       renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
       renderGrain(ctx, canvasW, canvasH, tpl.grain);
 
-      return canvasToBlob(canvas);
+      return canvasToBlob(await applyBackgroundMockup(canvas, background));
     }
   } else {
     // Mode Remote 2 HP Berjauhan
@@ -577,7 +580,7 @@ export async function composeFinal(
       renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
       renderGrain(ctx, canvasW, canvasH, tpl.grain);
 
-      return canvasToBlob(canvas);
+      return canvasToBlob(await applyBackgroundMockup(canvas, background));
     } else if (remoteLayout === "twin") {
       // ✂️ STRIP KEMBAR DUO (Strip Host di Kiri, Strip Guest di Kanan)
       canvasW = 1080;
@@ -702,7 +705,7 @@ export async function composeFinal(
       renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
       renderGrain(ctx, canvasW, canvasH, tpl.grain);
 
-      return canvasToBlob(canvas);
+      return canvasToBlob(await applyBackgroundMockup(canvas, background));
     } else {
       // 🪟 GRID KLASIK (8 Slot Berdampingan)
       let slotW: number;
@@ -798,7 +801,7 @@ export async function composeFinal(
       renderGlobalDecor(ctx, canvasW, canvasH, decor, dark);
       renderGrain(ctx, canvasW, canvasH, tpl.grain);
 
-      return canvasToBlob(canvas);
+      return canvasToBlob(await applyBackgroundMockup(canvas, background));
     }
   }
 }
@@ -876,4 +879,119 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
       0.9,
     );
   });
+}
+
+const BG_MOCKUP_ASSETS: Record<Exclude<PhotoBackground, "none">, string> = {
+  corkboard: "/backgrounds/corkboard.jpg",
+  studio: "/backgrounds/studio.jpg",
+  wood: "/backgrounds/wood.jpg",
+};
+
+async function applyBackgroundMockup(
+  stripCanvas: HTMLCanvasElement,
+  bgType: PhotoBackground = "none",
+): Promise<HTMLCanvasElement> {
+  if (bgType === "none" || !BG_MOCKUP_ASSETS[bgType]) {
+    return stripCanvas;
+  }
+
+  const bgUrl = BG_MOCKUP_ASSETS[bgType];
+  const bgImg = await imageFromURL(bgUrl);
+  if (!bgImg) {
+    return stripCanvas;
+  }
+
+  // Kanvas Mockup Definisi Tinggi: 1080 x 1920 (rasio 9:16 vertikal standar Instagram Story & layar HP)
+  const mockupW = 1080;
+  const mockupH = 1920;
+  const mockupCanvas = document.createElement("canvas");
+  mockupCanvas.width = mockupW;
+  mockupCanvas.height = mockupH;
+  const ctx = mockupCanvas.getContext("2d")!;
+
+  // 1. Gambar latar belakang mockup (cover penuh)
+  const bgScale = Math.max(mockupW / bgImg.width, mockupH / bgImg.height);
+  const bgDrawW = bgImg.width * bgScale;
+  const bgDrawH = bgImg.height * bgScale;
+  const bgDrawX = (mockupW - bgDrawW) / 2;
+  const bgDrawY = (mockupH - bgDrawH) / 2;
+  ctx.drawImage(bgImg, bgDrawX, bgDrawY, bgDrawW, bgDrawH);
+
+  // 2. Tentukan skala strip di dalam mockup
+  // Strip 1x4 (ramping): tinggi ~83% tinggi kanvas agar gagah di tengah meja/papan
+  // Grid 2x2 / Twin (lebar): dibatasi lebar maks 80% dan tinggi 84%
+  const isSingleStrip = stripCanvas.width / stripCanvas.height < 0.35;
+  const maxW = isSingleStrip ? mockupW * 0.46 : mockupW * 0.80;
+  const maxH = mockupH * 0.84;
+  const scale = Math.min(maxW / stripCanvas.width, maxH / stripCanvas.height);
+  const drawW = Math.round(stripCanvas.width * scale);
+  const drawH = Math.round(stripCanvas.height * scale);
+
+  // Titik tengah strip (sedikit diturunkan untuk komposisi natural di atas meja)
+  const centerX = mockupW / 2;
+  const centerY = mockupH / 2 + (bgType === "corkboard" ? 22 : 12);
+
+  // Sudut rotasi fisik lembut (-1.4 derajat) untuk memberi kesan foto fisik asli yang diletakkan
+  const angleDeg = bgType === "studio" ? -0.8 : -1.4;
+  const angleRad = (angleDeg * Math.PI) / 180;
+
+  // 3. Render strip foto dengan realistic soft physical drop shadow
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(angleRad);
+
+  // Lapisan bayangan 1: soft ambient spread
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.4)";
+  ctx.shadowBlur = 38;
+  ctx.shadowOffsetX = 10;
+  ctx.shadowOffsetY = 24;
+  ctx.drawImage(stripCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.restore();
+
+  // Lapisan bayangan 2: sharp contact shadow
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.18)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetX = 4;
+  ctx.shadowOffsetY = 8;
+  ctx.drawImage(stripCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.restore();
+
+  // Gambar strip asli di atas bayangan agar tepi tetap tajam
+  ctx.drawImage(stripCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
+
+  // 4. Aksen washi tape khusus tema corkboard (seperti preview cetak di landing page)
+  if (bgType === "corkboard") {
+    ctx.save();
+    // Posisi di ujung atas strip
+    ctx.translate(0, -drawH / 2 + 10);
+    ctx.rotate((2 * Math.PI) / 180); // sedikit miring berlawanan
+
+    const tapeW = Math.min(180, Math.max(120, drawW * 0.38));
+    const tapeH = 38;
+
+    // Bayangan tape
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 3;
+
+    // Body pita washi tape semi transparan amber/krem
+    ctx.fillStyle = "rgba(254, 243, 199, 0.88)";
+    ctx.fillRect(-tapeW / 2, -tapeH / 2, tapeW, tapeH);
+    ctx.restore();
+
+    // Garis tepi halus pita
+    ctx.strokeStyle = "rgba(245, 158, 11, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-tapeW / 2, -tapeH / 2, tapeW, tapeH);
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  return mockupCanvas;
 }

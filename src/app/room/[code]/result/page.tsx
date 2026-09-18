@@ -16,11 +16,13 @@ import {
   SOLO_LAYOUTS,
   REMOTE_LAYOUTS,
   PHOTO_RATIO_OPTIONS,
+  PHOTO_BACKGROUND_OPTIONS,
   type PhotoDecor,
   type PhotoStyle,
   type SoloLayout,
   type RemoteLayout,
   type PhotoRatio,
+  type PhotoBackground,
 } from "@/types/template";
 import { Btn, GhostBtn, ErrorMsg, StepBadge, Segmented, Field } from "@/components/ui";
 import { CheckIcon, ClockIcon, DownloadIcon, RefreshIcon, ShareIcon } from "@/components/icons";
@@ -51,6 +53,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
   const [style, setStyle] = useState<PhotoStyle>("original");
   const [decor, setDecor] = useState<PhotoDecor>("none");
   const [caption, setCaption] = useState("");
+  const [background, setBackground] = useState<PhotoBackground>("none");
   const [backHome, setBackHome] = useState(false);
   const [mobileTab, setMobileTab] = useState<"layout" | "frame" | "filter">("layout");
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -182,6 +185,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
           soloLayout,
           remoteLayout,
           ratio,
+          background,
         });
         if (cancelled) return;
         setFinalUrl((prev) => {
@@ -199,7 +203,7 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
     return () => {
       cancelled = true;
     };
-  }, [shots, tpl, slots, style, decor, caption, soloLayout, remoteLayout, ratio]);
+  }, [shots, tpl, slots, style, decor, caption, soloLayout, remoteLayout, ratio, background]);
 
   // Ambil ulang: broadcast retake → kedua HP kembali ke booth.
   const retake = async () => {
@@ -448,13 +452,83 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
             )}
 
             {mobileTab === "frame" && (
-              <div>
-                <Segmented
-                  label="Pilih bingkai"
-                  value={String(tplIndex)}
-                  onChange={(v) => setTplIndex(Number(v))}
-                  options={TEMPLATES.map((t, i) => ({ value: String(i), label: t.name }))}
-                />
+              <div className="space-y-3">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-booth-muted dark:text-booth-creamdim block mb-1">
+                    Warna Bingkai
+                  </span>
+                  <Segmented
+                    label="Pilih bingkai"
+                    value={String(tplIndex)}
+                    onChange={(v) => setTplIndex(Number(v))}
+                    options={TEMPLATES.map((t, i) => ({ value: String(i), label: t.name }))}
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-booth-line/40 dark:border-booth-nightline/40">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-booth-muted dark:text-booth-creamdim">
+                      Latar Belakang (Mockup Cetak)
+                    </span>
+                    <span className="text-[9px] font-semibold text-booth-accent dark:text-amber-300">
+                      {background === "none" ? "Tanpa Latar" : "Dengan Background"}
+                    </span>
+                  </div>
+
+                  {/* Primary Toggle: Tanpa vs Dengan */}
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setBackground("none")}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition text-center ${
+                        background === "none"
+                          ? "bg-white dark:bg-slate-900 text-booth-ink dark:text-white shadow-xs"
+                          : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                      }`}
+                    >
+                      🚫 Tanpa Background
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBackground(background === "none" ? "corkboard" : background)}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition text-center ${
+                        background !== "none"
+                          ? "bg-white dark:bg-slate-900 text-booth-ink dark:text-white shadow-xs"
+                          : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                      }`}
+                    >
+                      🖼️ Pakai Background
+                    </button>
+                  </div>
+
+                  {/* Sub-selector for background theme if active */}
+                  {background !== "none" && (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <span className="text-[9px] text-booth-muted dark:text-booth-creamdim block font-medium">
+                        Pilih Suasana Latar:
+                      </span>
+                      <div className="grid grid-cols-3 gap-1">
+                        {PHOTO_BACKGROUND_OPTIONS.filter((opt) => opt.value !== "none").map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBackground(opt.value)}
+                            className={`p-1.5 rounded-lg text-[11px] font-semibold border transition text-center ${
+                              background === opt.value
+                                ? "border-booth-accent bg-booth-accent/10 text-booth-accent font-bold dark:border-amber-400 dark:text-amber-300"
+                                : "border-booth-line/60 bg-transparent text-booth-muted hover:bg-black/[0.03] dark:border-booth-nightline dark:text-booth-creamdim"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-booth-muted dark:text-booth-creamdim text-center font-medium">
+                        {PHOTO_BACKGROUND_OPTIONS.find((opt) => opt.value === background)?.desc}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -612,6 +686,78 @@ export default function ResultPage({ params }: { params: Promise<{ code: string 
               onChange={(v) => setTplIndex(Number(v))}
               options={TEMPLATES.map((t, i) => ({ value: String(i), label: t.name }))}
             />
+          </div>
+
+          {/* Group 1.5: Background Mockup Cetak */}
+          <div className="booth-card rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-booth-muted dark:text-booth-creamdim block">
+                Latar Belakang (Mockup Cetak)
+              </label>
+              <span className="text-[10px] font-bold text-booth-accent dark:text-amber-300">
+                {background === "none" ? "Tanpa Latar (Cetak)" : "Mockup Estetik"}
+              </span>
+            </div>
+
+            {/* Primary Toggle: Tanpa Background vs Dengan Background */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl mb-2.5">
+              <button
+                type="button"
+                onClick={() => setBackground("none")}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition text-center flex items-center justify-center gap-1.5 ${
+                  background === "none"
+                    ? "bg-white dark:bg-slate-900 text-booth-ink dark:text-white shadow-xs"
+                    : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                }`}
+              >
+                <span>🚫</span>
+                <span>Tanpa Background</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBackground(background === "none" ? "corkboard" : background)}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition text-center flex items-center justify-center gap-1.5 ${
+                  background !== "none"
+                    ? "bg-white dark:bg-slate-900 text-booth-ink dark:text-white shadow-xs"
+                    : "text-booth-muted hover:text-booth-ink dark:text-booth-creamdim"
+                }`}
+              >
+                <span>🖼️</span>
+                <span>Pakai Background</span>
+              </button>
+            </div>
+
+            {/* Theme Selector if With Background */}
+            {background !== "none" ? (
+              <div className="space-y-2 animate-in fade-in duration-200">
+                <span className="text-[10px] text-booth-muted dark:text-booth-creamdim block font-medium">
+                  Pilih Suasana Mockup:
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {PHOTO_BACKGROUND_OPTIONS.filter((opt) => opt.value !== "none").map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setBackground(opt.value)}
+                      className={`p-2 rounded-xl text-xs font-semibold border transition text-center flex flex-col items-center gap-1 ${
+                        background === opt.value
+                          ? "border-booth-accent bg-booth-accent/10 text-booth-accent font-bold dark:border-amber-400 dark:text-amber-300"
+                          : "border-booth-line/60 bg-transparent text-booth-muted hover:bg-black/[0.03] dark:border-booth-nightline dark:text-booth-creamdim"
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-booth-muted dark:text-booth-creamdim leading-tight">
+                  {PHOTO_BACKGROUND_OPTIONS.find((opt) => opt.value === background)?.desc}
+                </p>
+              </div>
+            ) : (
+              <p className="text-[11px] text-booth-muted dark:text-booth-creamdim leading-tight">
+                Strip foto murni tanpa latar belakang tambahan, format ideal untuk langsung dicetak fisik atau dipotong.
+              </p>
+            )}
           </div>
 
           {/* Group 2: Style & Decor */}
